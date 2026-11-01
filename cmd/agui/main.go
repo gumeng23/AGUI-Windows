@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,18 +18,24 @@ import (
 	"agui/internal/winres"
 )
 
-const version = "0.3.0"
+const version = "0.5.0"
 
 // embedMagic marks a trailing script appended by `agui build`.
 const embedMagic = "AGUIEMB\x01"
+const embedMagic2 = "AGUIEMB"
+
+// assetBundle is JSON stored in the v2 trailer.
+type assetBundle struct {
+	Files map[string]string `json:"files"`
+}
 
 func main() {
-	if src, ok, err := embeddedScript(); err != nil {
+	if src, assets, baseDir, ok, err := embeddedScript(); err != nil {
 		gui.ShowError("Agui 错误", "读取内置脚本失败："+err.Error())
 		os.Exit(1)
 	} else if ok {
 		rest, shot, debug := parseRuntimeArgs(os.Args[1:])
-		runSource(src, "内置脚本", rest, shot, true, debug)
+		runSource(src, "内置脚本", rest, shot, true, debug, assets, baseDir)
 		return
 	}
 
@@ -96,6 +104,7 @@ func usage() {
 打包选项：
   -o <文件>                          输出文件名，默认与脚本同名
   -console                           强制复用当前控制台版本（默认优先找同目录 aguiw.exe）
+  --asset <文件/目录>                嵌入资源，可重复；目录按目录名挂载
   --icon <app.ico>                   嵌入 exe 图标
   --product <名称>                   产品名称（版本信息）
   --company <名称>                   公司名称
@@ -172,6 +181,7 @@ func parseInitArgs(args []string) (dir, name string, err error) {
 
 type buildOptions struct {
 	icon        string
+	assets      []string
 	product     string
 	company     string
 	description string
@@ -204,6 +214,14 @@ func parseBuildArgs(args []string) (file, out string, opts buildOptions, err err
 			out = strings.TrimPrefix(a, "--output=")
 		case a == "-console" || a == "--console":
 			opts.console = true
+		case a == "--asset":
+			v, ok := next(a)
+			if !ok {
+				return "", "", opts, err
+			}
+			opts.assets = append(opts.assets, v)
+		case strings.HasPrefix(a, "--asset="):
+			opts.assets = append(opts.assets, strings.TrimPrefix(a, "--asset="))
 		case a == "--icon":
 			v, ok := next(a)
 			if !ok {
@@ -270,10 +288,14 @@ func runFile(path, shot string, extra []string, debug bool, embedded bool) {
 		fail(fmt.Errorf("无法读取脚本：%w", err), nil, embedded)
 		os.Exit(1)
 	}
-	runSource(string(src), path, extra, shot, embedded, debug)
+	baseDir := filepath.Dir(path)
+	if abs, absErr := filepath.Abs(path); absErr == nil {
+		baseDir = filepath.Dir(abs)
+	}
+	runSource(string(src), path, extra, shot, embedded, debug, nil, baseDir)
 }
 
-func runSource(src, name string, extra []string, shot string, embedded bool, debug bool) {
+func runSource(src, name string, extra []string, shot string, embedded bool, debug bool, assets map[string][]byte, baseDir string) {
 	if debug {
 		os.Setenv("AGUI_DEBUG", "1")
 		fmt.Fprintln(os.Stderr, "[debug] 调试模式已开启")
@@ -290,6 +312,11 @@ func runSource(src, name string, extra []string, shot string, embedded bool, deb
 	}
 
 	i := lang.New()
+	if baseDir == "" {
+		baseDir, _ = os.Getwd()
+	}
+	i.SetAssets(assets, baseDir)
+	i.SetBaseDir(baseDir)
 	app, err := registerGUI(i)
 	if err != nil {
 		fail(fmt.Errorf("初始化 GUI 失败：%w", err), nil, embedded)
@@ -438,31 +465,162 @@ func fail(err error, i *lang.Interp, embedded bool) {
 	if i != nil {
 		text = i.FormatError(err)
 	}
-	if embedded {
+	if embedded && os.Getenv("AGUI_STDERR") == "" {
 		gui.ShowError("Agui 运行错误", text)
 		return
 	}
 	fmt.Fprintln(os.Stderr, text)
 }
 
-func embeddedScript() (string, bool, error) {
+func embeddedScript() (string, map[string][]byte, string, bool, error) {
 	exe, err := os.Executable()
 	if err != nil {
-		return "", false, nil
+		return "", nil, "", false, nil
 	}
 	data, err := os.ReadFile(exe)
 	if err != nil {
-		return "", false, nil
+		return "", nil, "", false, nil
 	}
-	if len(data) < 16 || string(data[len(data)-8:]) != embedMagic {
-		return "", false, nil
+	baseDir := filepath.Dir(exe)
+	if len(data) < 8 {
+		return "", nil, "", false, nil
 	}
-	n := binary.LittleEndian.Uint64(data[len(data)-16 : len(data)-8])
-	if n > uint64(len(data)-16) {
-		return "", false, fmt.Errorf("内置脚本长度无效")
+	magic := string(data[len(data)-8:])
+	switch magic {
+	case embedMagic:
+		if len(data) < 16 {
+			return "", nil, "", false, fmt.Errorf("内置脚本长度无效")
+		}
+		n := binary.LittleEndian.Uint64(data[len(data)-16 : len(data)-8])
+		if n > uint64(len(data)-16) {
+			return "", nil, "", false, fmt.Errorf("内置脚本长度无效")
+		}
+		start := len(data) - 16 - int(n)
+		return string(data[start : len(data)-16]), nil, baseDir, true, nil
+	case embedMagic2:
+		if len(data) < 32 {
+			return "", nil, "", false, fmt.Errorf("内置脚本长度无效")
+		}
+		scriptLen := binary.LittleEndian.Uint64(data[len(data)-24 : len(data)-16])
+		assetsLen := binary.LittleEndian.Uint64(data[len(data)-16 : len(data)-8])
+		if scriptLen > uint64(len(data)-32) || assetsLen > uint64(len(data)-32)-scriptLen {
+			return "", nil, "", false, fmt.Errorf("内置脚本长度无效")
+		}
+		start := len(data) - 24 - int(scriptLen) - int(assetsLen)
+		src := string(data[start : start+int(scriptLen)])
+		assets := map[string][]byte{}
+		if assetsLen > 0 {
+			var bundle assetBundle
+			if err := json.Unmarshal(data[start+int(scriptLen):start+int(scriptLen)+int(assetsLen)], &bundle); err != nil {
+				return "", nil, "", false, fmt.Errorf("内置资源损坏: %v", err)
+			}
+			for name, enc := range bundle.Files {
+				raw, err := base64.StdEncoding.DecodeString(enc)
+				if err != nil {
+					return "", nil, "", false, fmt.Errorf("内置资源 %s 损坏: %v", name, err)
+				}
+				assets[name] = raw
+			}
+		}
+		return src, assets, baseDir, true, nil
+	default:
+		return "", nil, "", false, nil
 	}
-	start := len(data) - 16 - int(n)
-	return string(data[start : len(data)-16]), true, nil
+}
+
+// collectAssets reads files/directories into a virtual path map. A directory
+// is mounted under its base name, so --asset assets puts assets/logo.png at
+// the script-visible path "assets/logo.png".
+// collectScriptModules gathers .ag files next to the entry script so packaged
+// applications can import sibling modules without extra --asset flags.
+func collectScriptModules(dir, skip string) (map[string][]byte, error) {
+	out := map[string][]byte{}
+	skipAbs, _ := filepath.Abs(skip)
+	err := filepath.Walk(dir, func(p string, fi os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if fi.IsDir() || !strings.EqualFold(filepath.Ext(p), ".ag") {
+			return nil
+		}
+		if abs, _ := filepath.Abs(p); abs == skipAbs {
+			return nil
+		}
+		rel, err := filepath.Rel(dir, p)
+		if err != nil {
+			return err
+		}
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		out[filepath.ToSlash(rel)] = raw
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func collectAssets(paths []string, skip string) (map[string][]byte, error) {
+	out := map[string][]byte{}
+	skipAbs, _ := filepath.Abs(skip)
+	for _, root := range paths {
+		info, err := os.Stat(root)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", root, err)
+		}
+		if !info.IsDir() {
+			raw, err := os.ReadFile(root)
+			if err != nil {
+				return nil, err
+			}
+			if abs, _ := filepath.Abs(root); abs == skipAbs {
+				continue
+			}
+			out[filepath.ToSlash(filepath.Base(root))] = raw
+			continue
+		}
+		prefix := filepath.Base(filepath.Clean(root))
+		if prefix == "." || prefix == string(filepath.Separator) {
+			prefix = ""
+		}
+		err = filepath.Walk(root, func(p string, fi os.FileInfo, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if fi.IsDir() {
+				return nil
+			}
+			if abs, _ := filepath.Abs(p); abs == skipAbs {
+				return nil
+			}
+			rel, err := filepath.Rel(root, p)
+			if err != nil {
+				return err
+			}
+			key := filepath.ToSlash(rel)
+			if prefix != "" {
+				key = prefix + "/" + key
+			}
+			raw, err := os.ReadFile(p)
+			if err != nil {
+				return err
+			}
+			out[key] = raw
+			if prefix != "" {
+				if _, exists := out[filepath.ToSlash(rel)]; !exists {
+					out[filepath.ToSlash(rel)] = raw
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", root, err)
+		}
+	}
+	return out, nil
 }
 
 func buildFile(path, out string, opts buildOptions) {
@@ -538,11 +696,35 @@ func buildFile(path, out string, opts buildOptions) {
 		fmt.Fprintf(os.Stderr, "写入图标/版本资源失败：%v\n", err)
 		os.Exit(1)
 	}
+	assetFiles, err := collectScriptModules(filepath.Dir(path), out)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "读取模块失败：%v\n", err)
+		os.Exit(1)
+	}
+	explicit, err := collectAssets(opts.assets, out)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "读取资源失败：%v\n", err)
+		os.Exit(1)
+	}
+	for name, raw := range explicit {
+		assetFiles[name] = raw
+	}
+	bundle := assetBundle{Files: map[string]string{}}
+	for name, raw := range assetFiles {
+		bundle.Files[name] = base64.StdEncoding.EncodeToString(raw)
+	}
+	assetsJSON, err := json.Marshal(bundle)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "打包资源失败：%v\n", err)
+		os.Exit(1)
+	}
 	data = append(data, []byte(src)...)
-	var size [8]byte
-	binary.LittleEndian.PutUint64(size[:], uint64(len(src)))
-	data = append(data, size[:]...)
-	data = append(data, []byte(embedMagic)...)
+	data = append(data, assetsJSON...)
+	var lens [16]byte
+	binary.LittleEndian.PutUint64(lens[0:8], uint64(len(src)))
+	binary.LittleEndian.PutUint64(lens[8:16], uint64(len(assetsJSON)))
+	data = append(data, lens[:]...)
+	data = append(data, []byte(embedMagic2)...)
 	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
 		fmt.Fprintf(os.Stderr, "无法创建输出目录：%v\n", err)
 		os.Exit(1)

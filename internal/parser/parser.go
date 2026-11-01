@@ -646,7 +646,7 @@ func (p *parser) finishCall(callee ast.Expr) (ast.Expr, error) {
 	p.advance() // (
 	call := &ast.CallExpr{Base: ast.Base{Line: line}, Callee: callee}
 	for !p.check(token.RPAREN) && !p.check(token.EOF) {
-		if p.check(token.IDENT) && p.peek(1).Type == token.ASSIGN {
+		if (p.check(token.IDENT) || p.check(token.RAISE)) && p.peek(1).Type == token.ASSIGN {
 			name := p.cur().Lit
 			argLine := p.cur().Line
 			p.advance()

@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestParseRunArgs(t *testing.T) {
 	file, shot, rest, debug, err := parseRunArgs([]string{"--shot=out.png", "app.ag", "one", "two"})
@@ -62,6 +66,39 @@ func TestParseInitArgsDefaults(t *testing.T) {
 	}
 	if dir != "." || name != "" {
 		t.Fatalf("解析结果错误：dir=%q name=%q", dir, name)
+	}
+}
+
+func TestCollectScriptModules(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "lib"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "main.ag"), []byte("import \"lib/math\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "lib", "math.ag"), []byte("func inc(x):\n    return x+1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(dir, "app.exe")
+	if err := os.WriteFile(out, []byte("exe"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	files, err := collectScriptModules(dir, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := files["main.ag"]; !ok {
+		t.Fatal("缺少 main.ag")
+	}
+	if _, ok := files["lib/math.ag"]; !ok {
+		t.Fatal("缺少 lib/math.ag")
+	}
+	if _, ok := files["notes.txt"]; ok {
+		t.Fatal("不应收集非 .ag 文件")
 	}
 }
 

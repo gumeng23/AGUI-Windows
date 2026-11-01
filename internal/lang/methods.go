@@ -17,6 +17,16 @@ func (i *Interp) callMethod(obj Value, name string, args []Value, kwargs map[str
 		}
 		return v
 	}
+	if t, ok := obj.(*Task); ok {
+		v, handled, err := t.CallMethod(i, name, args, kwargs)
+		if err != nil {
+			i.throw("%s", err.Error())
+		}
+		if !handled {
+			i.throw("任务没有方法 %q", name)
+		}
+		return v
+	}
 	if len(kwargs) > 0 {
 		i.throw("方法 %s 不支持关键字参数", name)
 	}

@@ -10,5 +10,8 @@
 /build/
 /shots/
 
+# 资源包运行时解压缓存
+/.agui-cache/
+
 # 示例运行时生成的数据
 /todo.txt

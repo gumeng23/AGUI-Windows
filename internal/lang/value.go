@@ -206,6 +206,10 @@ func TypeName(v Value) string {
 		return "class"
 	case *Instance:
 		return "object"
+	case *Task:
+		return "task"
+	case *WebSocket:
+		return "websocket"
 	case *Function, *Native:
 		return "function"
 	default:

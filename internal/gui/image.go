@@ -119,7 +119,11 @@ func loadMenuBitmap(path string) (syscall.Handle, error) {
 }
 
 func (w *Widget) loadImage(path string) error {
-	img, iw, ih, err := loadGdiImage(path)
+	resolved, err := w.app.interp.AssetPath(path)
+	if err != nil {
+		return err
+	}
+	img, iw, ih, err := loadGdiImage(resolved)
 	if err != nil {
 		return err
 	}

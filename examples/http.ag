@@ -1,0 +1,14 @@
+// HTTP 客户端示例：默认访问 example.com，也可传入自己的 URL。
+url = "https://example.com"
+if len(args) > 0:
+    url = args[0]
+
+r = http_get(url, timeout=15, raise=false)
+print("状态", r.status, "成功", r.ok)
+if r.ok:
+    print("Content-Type:", r.content_type)
+    print("长度:", r.length, "耗时:", r.elapsed, "秒")
+    print("cookies:", r.cookies)
+    print(r.body.substr(0, 120))
+else:
+    print("请求失败:", r.error)

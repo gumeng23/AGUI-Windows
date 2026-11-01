@@ -124,6 +124,7 @@ func (w *Widget) setHeaders(headers []string) {
 	if w.kind != "table" {
 		return
 	}
+	rows := w.tableRows()
 	sendMessage(w.hwnd, lvmDeleteAllItems, 0, 0)
 	for i := w.cols - 1; i >= 0; i-- {
 		sendMessage(w.hwnd, lvmDeleteColumn, uintptr(i), 0)
@@ -146,6 +147,17 @@ func (w *Widget) setHeaders(headers []string) {
 			iSubItem: int32(i),
 		}
 		sendMessage(w.hwnd, lvmInsertColumnW, uintptr(i), uintptr(unsafe.Pointer(&col)))
+	}
+	for _, rv := range rows.Items {
+		row, ok := rv.(*lang.List)
+		if !ok {
+			continue
+		}
+		cells := make([]string, 0, len(row.Items))
+		for _, cv := range row.Items {
+			cells = append(cells, lang.ToString(cv))
+		}
+		w.addRow(cells)
 	}
 }
 
@@ -283,25 +295,52 @@ func (w *Widget) beginCellEdit(row, col int32) {
 	if w.kind != "table" || !w.editable || row < 0 || col < 0 || col >= int32(w.cols) {
 		return
 	}
+	if row >= int32(sendMessage(w.hwnd, lvmGetItemCount, 0, 0)) {
+		return
+	}
 	w.commitCellEdit(true)
 	var rc rect
 	rc.left = col
 	rc.top = lvirBounds
 	sendMessage(w.hwnd, lvmGetSubitemRect, uintptr(row), uintptr(unsafe.Pointer(&rc)))
-	cw := rc.right - rc.left
-	ch := rc.bottom - rc.top
-	if cw <= 0 {
-		cw = 100
+	client, ok := getClientRect(w.hwnd)
+	if !ok {
+		client = rect{}
 	}
-	if ch <= 0 {
-		ch = w.app.px(24)
+	left, top, right, bottom := rc.left, rc.top, rc.right, rc.bottom
+	if client.right > 0 {
+		if left < 0 {
+			left = 0
+		}
+		if top < 0 {
+			top = 0
+		}
+		if right > client.right {
+			right = client.right
+		}
+		if bottom > client.bottom {
+			bottom = client.bottom
+		}
 	}
+	if right <= left || bottom <= top {
+		left, top = 0, 0
+		right, bottom = w.app.px(100), w.app.px(24)
+	}
+	cw := right - left
+	ch := bottom - top
 	parent := w.hwnd
 	if w.parent != nil {
 		parent = w.parent.hwnd
 	}
-	x := w.x + rc.left
-	y := w.y + rc.top
+	pt := point{x: left, y: top}
+	if w.parent != nil {
+		pMapWindowPoints.Call(uintptr(w.hwnd), uintptr(parent), uintptr(unsafe.Pointer(&pt)), 1)
+	} else {
+		pt.x += w.x
+		pt.y += w.y
+	}
+	x := pt.x
+	y := pt.y
 	h := createWindow(0, "EDIT", w.tableCell(int(row), int(col)),
 		uint32(wsChild|wsVisible|wsBorder|wsTabStop|esAutoHScroll), x, y, cw, ch, parent, 0)
 	if h == 0 {
@@ -331,6 +370,7 @@ func (w *Widget) finishCellEdit(save bool) {
 	}
 	if save && w.kind == "table" {
 		w.setTableCell(row, col, txt)
+		w.emit("edit")
 	}
 	pDestroyWindow.Call(uintptr(h))
 	if w.hwnd != 0 {

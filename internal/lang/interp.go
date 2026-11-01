@@ -1,6 +1,7 @@
 package lang
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"strings"
+	"time"
 
 	"agui/internal/ast"
 	"agui/internal/lexer"
@@ -48,6 +50,12 @@ type Interp struct {
 	maxDepth  int
 	imported  map[string]bool
 	mu        reentrantMutex
+
+	coop      bool
+	task      *Task
+	lastYield time.Time
+	assets    *AssetStore
+	dispatch  func(func())
 }
 
 // New creates an interpreter with all core built-ins installed.
@@ -58,10 +66,28 @@ func New() *Interp {
 		SourceName: "<script>",
 		maxDepth:   512,
 		imported:   map[string]bool{},
+		assets:     newAssetStore(),
 	}
 	registerBuiltins(i)
 	registerStdlib(i)
+	registerWebSocket(i)
 	return i
+}
+
+// SetDispatcher installs a host callback used to deliver network events on the
+// UI thread. When it is nil, events run in a protected background goroutine.
+func (i *Interp) SetDispatcher(fn func(func())) {
+	i.dispatch = fn
+}
+
+// Dispatch delivers fn through the host dispatcher, or runs it inline with the
+// interpreter lock held (blocking until the current script yields).
+func (i *Interp) Dispatch(fn func()) {
+	if i.dispatch != nil {
+		i.dispatch(fn)
+		return
+	}
+	i.Protect(fn)
 }
 
 // SetSource records the source text for error messages and sets Source/Lines.
@@ -111,9 +137,29 @@ func (i *Interp) Execute(prog *ast.Program) error {
 
 // Protect runs fn and turns Agui panics into errors. It is used for top level
 // execution and for every GUI callback, so one bad handler cannot kill the app.
-func (i *Interp) Protect(fn func()) (err error) {
+func (i *Interp) Protect(fn func()) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
+	oldCoop, oldTask := i.coop, i.task
+	i.coop, i.task = false, nil
+	defer func() { i.coop, i.task = oldCoop, oldTask }()
+	return i.protectPanic(fn)
+}
+
+// ProtectCooperative runs fn as a background task. The interpreter lock is
+// still held, but background statements periodically suspend it so the UI can
+// run. Protect never yields, so callbacks and event handlers stay atomic.
+func (i *Interp) ProtectCooperative(task *Task, fn func()) error {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	oldCoop, oldTask := i.coop, i.task
+	i.coop, i.task = true, task
+	i.lastYield = time.Now()
+	defer func() { i.coop, i.task = oldCoop, oldTask }()
+	return i.protectPanic(fn)
+}
+
+func (i *Interp) protectPanic(fn func()) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			switch r.(type) {
@@ -133,6 +179,62 @@ func (i *Interp) Protect(fn func()) (err error) {
 	}()
 	fn()
 	return nil
+}
+
+// TaskContext returns the current background task context, or nil for UI work.
+func (i *Interp) TaskContext() context.Context {
+	if i.task == nil {
+		return nil
+	}
+	return i.task.Context()
+}
+
+// maybeYield lets the UI run during a long background task.
+func (i *Interp) maybeYield() {
+	if !i.coop || i.task == nil {
+		return
+	}
+	if i.task.Context().Err() != nil {
+		i.throw("任务已取消")
+	}
+	if time.Since(i.lastYield) < 4*time.Millisecond {
+		return
+	}
+	depth := i.mu.Suspend()
+	time.Sleep(time.Millisecond)
+	i.lastYield = time.Now()
+	i.mu.Resume(depth)
+	if i.task.Context().Err() != nil {
+		i.throw("任务已取消")
+	}
+}
+
+// Sleep is the cooperative version used by the sleep() built-in.
+func (i *Interp) Sleep(d time.Duration) {
+	if !i.coop || i.task == nil {
+		time.Sleep(d)
+		return
+	}
+	depth := i.mu.Suspend()
+	defer i.mu.Resume(depth)
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+	case <-i.task.Context().Done():
+		i.throw("任务已取消")
+	}
+}
+
+// Blocking releases the interpreter lock while fn performs blocking I/O.
+func (i *Interp) Blocking(fn func() error) error {
+	if !i.coop || i.task == nil {
+		return fn()
+	}
+	depth := i.mu.Suspend()
+	err := fn()
+	i.mu.Resume(depth)
+	return err
 }
 
 // CallValue calls a function value with no arguments. The GUI uses it for
@@ -206,6 +308,7 @@ func (i *Interp) execBlock(stmts []ast.Stmt, env *Env) {
 }
 
 func (i *Interp) execStmt(s ast.Stmt, env *Env) {
+	i.maybeYield()
 	i.line = s.LineNo()
 	switch n := s.(type) {
 	case *ast.ExprStmt:
@@ -324,23 +427,44 @@ func (i *Interp) execImport(n *ast.ImportStmt, env *Env) {
 	if strings.TrimSpace(raw) == "" {
 		i.throw("import 需要一个文件路径")
 	}
-	path := raw
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(filepath.Dir(i.SourceName), path)
+	name := filepath.ToSlash(raw)
+	if filepath.Ext(name) == "" {
+		name += ".ag"
 	}
-	if filepath.Ext(path) == "" {
-		path += ".ag"
+	key := name
+	var data []byte
+	var err error
+	if !filepath.IsAbs(raw) && i.HasAsset(name) {
+		key = normalizeAssetPath(name)
+		data, _ = i.AssetBytes(name)
+	} else {
+		p := raw
+		if !filepath.IsAbs(p) {
+			dir := filepath.Dir(i.SourceName)
+			if dir == "." {
+				dir = i.BaseDir()
+			}
+			p = filepath.Join(dir, p)
+		}
+		if filepath.Ext(p) == "" {
+			p += ".ag"
+		}
+		abs, absErr := filepath.Abs(p)
+		if absErr != nil {
+			i.throw("import %q: %v", raw, absErr)
+		}
+		key = abs
+		err = i.Blocking(func() error {
+			var readErr error
+			data, readErr = os.ReadFile(abs)
+			return readErr
+		})
 	}
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		i.throw("import %q: %v", raw, err)
-	}
-	if i.imported[abs] {
-		return
-	}
-	data, err := os.ReadFile(abs)
 	if err != nil {
 		i.throw("无法导入 %q: %v", raw, err)
+	}
+	if i.imported[key] {
+		return
 	}
 	toks, err := lexer.Lex(string(data))
 	if err != nil {
@@ -350,16 +474,15 @@ func (i *Interp) execImport(n *ast.ImportStmt, env *Env) {
 	if err != nil {
 		i.throw("导入 %q 失败: %v", raw, err)
 	}
-	i.imported[abs] = true
+	i.imported[key] = true
 	defer func() {
 		if r := recover(); r != nil {
-			delete(i.imported, abs)
+			delete(i.imported, key)
 			panic(r)
 		}
 	}()
 	i.execBlock(prog.Stmts, env)
 }
-
 func (i *Interp) execOn(n *ast.OnStmt, env *Env) {
 	obj := i.eval(n.Target, env)
 	w, ok := obj.(Widget)
@@ -539,6 +662,16 @@ func (i *Interp) eval(e ast.Expr, env *Env) Value {
 			return v
 		case *Instance:
 			return i.getAttr(o, n.Name)
+		case *Task:
+			if v, ok := o.GetProp(n.Name); ok {
+				return v
+			}
+			i.throw("任务没有属性 %q", n.Name)
+		case *WebSocket:
+			if v, ok := o.GetProp(n.Name); ok {
+				return v
+			}
+			i.throw("WebSocket 没有属性 %q", n.Name)
 		case *Class:
 			if fn, ok := o.Methods[n.Name]; ok {
 				return fn

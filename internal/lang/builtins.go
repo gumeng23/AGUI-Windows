@@ -623,7 +623,7 @@ func registerBuiltins(i *Interp) {
 		if ms > 60_000 {
 			return nil, fmt.Errorf("sleep(): 最多等待 60 秒")
 		}
-		time.Sleep(time.Duration(ms) * time.Millisecond)
+		i.Sleep(time.Duration(ms) * time.Millisecond)
 		return nil, nil
 	})
 	reg("set_recursion_limit", func(i *Interp, args []Value, kwargs map[string]Value) (Value, error) {
@@ -648,7 +648,12 @@ func registerBuiltins(i *Interp) {
 		if err != nil {
 			return nil, err
 		}
-		data, err := os.ReadFile(path)
+		var data []byte
+		err = i.Blocking(func() error {
+			var readErr error
+			data, readErr = i.ReadFile(path)
+			return readErr
+		})
 		if err != nil {
 			return nil, fmt.Errorf("read_file(): %v", err)
 		}
@@ -662,7 +667,9 @@ func registerBuiltins(i *Interp) {
 		if !ok {
 			return nil, fmt.Errorf("write_file(): 路径必须是字符串")
 		}
-		if err := os.WriteFile(path, []byte(ToString(args[1])), 0o644); err != nil {
+		content := []byte(ToString(args[1]))
+		path = i.ResolvePath(path)
+		if err := i.Blocking(func() error { return os.WriteFile(path, content, 0o644) }); err != nil {
 			return nil, fmt.Errorf("write_file(): %v", err)
 		}
 		return nil, nil
@@ -675,12 +682,18 @@ func registerBuiltins(i *Interp) {
 		if !ok {
 			return nil, fmt.Errorf("append_file(): 路径必须是字符串")
 		}
-		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		text := ToString(args[1])
+		path = i.ResolvePath(path)
+		err := i.Blocking(func() error {
+			f, openErr := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+			if openErr != nil {
+				return openErr
+			}
+			defer f.Close()
+			_, writeErr := f.WriteString(text)
+			return writeErr
+		})
 		if err != nil {
-			return nil, fmt.Errorf("append_file(): %v", err)
-		}
-		defer f.Close()
-		if _, err := f.WriteString(ToString(args[1])); err != nil {
 			return nil, fmt.Errorf("append_file(): %v", err)
 		}
 		return nil, nil
@@ -690,15 +703,15 @@ func registerBuiltins(i *Interp) {
 		if err != nil {
 			return nil, err
 		}
-		_, statErr := os.Stat(path)
-		return statErr == nil, nil
+		return i.FileExists(path), nil
 	})
 	reg("delete_file", func(i *Interp, args []Value, kwargs map[string]Value) (Value, error) {
 		path, err := oneString("delete_file", args)
 		if err != nil {
 			return nil, err
 		}
-		if removeErr := os.Remove(path); removeErr != nil {
+		path = i.ResolvePath(path)
+		if removeErr := i.Blocking(func() error { return os.Remove(path) }); removeErr != nil {
 			return nil, fmt.Errorf("delete_file(): %v", removeErr)
 		}
 		return nil, nil
@@ -708,13 +721,37 @@ func registerBuiltins(i *Interp) {
 		if err != nil {
 			return nil, err
 		}
-		entries, readErr := os.ReadDir(path)
-		if readErr != nil {
+		seen := map[string]bool{}
+		var names []string
+		for _, name := range i.AssetNames(path) {
+			base := filepath.Base(name)
+			if name == normalizeAssetPath(path) {
+				continue
+			}
+			if !seen[base] {
+				seen[base] = true
+				names = append(names, base)
+			}
+		}
+		var entries []os.DirEntry
+		readErr := i.Blocking(func() error {
+			var dirErr error
+			entries, dirErr = os.ReadDir(i.ResolvePath(path))
+			return dirErr
+		})
+		if readErr != nil && len(names) == 0 {
 			return nil, fmt.Errorf("list_dir(): %v", readErr)
 		}
-		out := make([]Value, len(entries))
-		for idx, e := range entries {
-			out[idx] = e.Name()
+		for _, e := range entries {
+			if !seen[e.Name()] {
+				seen[e.Name()] = true
+				names = append(names, e.Name())
+			}
+		}
+		sort.Strings(names)
+		out := make([]Value, len(names))
+		for idx, name := range names {
+			out[idx] = name
 		}
 		return &List{Items: out}, nil
 	})
@@ -723,7 +760,8 @@ func registerBuiltins(i *Interp) {
 		if err != nil {
 			return nil, err
 		}
-		if mkErr := os.MkdirAll(path, 0o755); mkErr != nil {
+		path = i.ResolvePath(path)
+		if mkErr := i.Blocking(func() error { return os.MkdirAll(path, 0o755) }); mkErr != nil {
 			return nil, fmt.Errorf("mkdir(): %v", mkErr)
 		}
 		return nil, nil

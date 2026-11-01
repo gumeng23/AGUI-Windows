@@ -72,6 +72,8 @@ var (
 	pFrameRect              = user32.NewProc("FrameRect")
 	pBeginPaint             = user32.NewProc("BeginPaint")
 	pEndPaint               = user32.NewProc("EndPaint")
+	pSetScrollRange         = user32.NewProc("SetScrollRange")
+	pSetScrollPos           = user32.NewProc("SetScrollPos")
 	pIsWindow               = user32.NewProc("IsWindow")
 	pGetClipboardData       = user32.NewProc("GetClipboardData")
 	pSetClipboardData       = user32.NewProc("SetClipboardData")
@@ -178,6 +180,17 @@ const (
 	wmCommand         = 0x0111
 	wmTimer           = 0x0113
 	wmHScroll         = 0x0114
+	wmVScroll         = 0x0115
+	wmMouseWheel      = 0x020A
+	sbLineUp          = 0
+	sbLineDown        = 1
+	sbPageUp          = 2
+	sbPageDown        = 3
+	sbThumbTrack      = 5
+	sbThumbPosition   = 4
+	sbTop             = 6
+	sbBottom          = 7
+	sbVert            = 1
 	wmCtlColorBtn     = 0x0135
 	wmCtlColorEdit    = 0x0133
 	wmCtlColorListBox = 0x0134

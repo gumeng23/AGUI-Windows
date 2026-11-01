@@ -1,6 +1,6 @@
 # Agui 语言与 GUI 参考
 
-本文档对应 Agui 0.1。示例默认使用英文关键字；中文关键字别名在 [2.3](#23-关键字与中文别名) 中列出。
+本文档对应 Agui 0.4。示例默认使用英文关键字；中文关键字别名在 [2.3](#23-关键字与中文别名) 中列出。
 
 ---
 
@@ -434,7 +434,7 @@ win = window("标题", w=900, h=640, bg="#F7F8FA", resizable=true)
 ```
 
 - 不调用 `window()` 而直接创建控件时，会自动创建一个 900×640、标题为“Agui 应用”的窗口。
-- 再次调用 `window()` 会更新已有窗口的标题、大小和背景。
+- 每次调用 `window()` 都会创建一个新的顶层窗口；用 `win.use()` / `win.activate()` 切换后续控件默认放入哪个窗口。
 - `w` / `h` 是**客户区**尺寸（不含标题栏和边框）。
 - 坐标和尺寸使用逻辑像素（96 DPI 基准）；在高 DPI 屏幕上 Agui 会按系统 DPI 缩放。
 - 窗口默认使用系统默认位置，可以用 `win.center()` 居中。
@@ -458,6 +458,32 @@ edit("自动占满宽度")                            # 自动
 button("固定", x=20, y=200, w=150, h=36)       # 精确
 ```
 
+#### 容器、锚点与网格
+
+```agui
+card = panel(x=20, y=20, w=360, h=220)
+label("账户", parent=card)
+edit("用户名", parent=card)
+checkbox("记住我", parent=card)
+
+side = scroll(x=400, y=20, w=300, h=220)
+for i in range(20):
+    label("列表项 " + str(i), parent=side)
+
+keys = grid(cols=3, x=20, y=260, w=420, h=160)
+for k in ["7", "8", "9", "4", "5", "6"]:
+    button(k, parent=keys)
+
+ok = button("确定", anchor="right bottom", x=20, y=20, w=120, h=36)
+```
+
+- `panel()` 是无滚动容器；`scroll()` 带垂直滚动条，支持滚轮；`grid(cols=2)` 按列数排列子控件。
+- 子控件传 `parent=容器对象`；容器可以嵌套，groupbox 内也可以再放 panel/grid。
+- 不写 `x/y` 时，子控件从容器左上角按 `margin`、`gap` 纵向排列；容器自身的 `x/y/w/h` 仍按父级规则。
+- `anchor` 可为 `left`、`right`、`top`、`bottom` 的组合。`right` 贴右、`bottom` 贴底；同时 `left right` 横向拉伸、`top bottom` 纵向拉伸。
+- `visible=false` 的控件不显示，也不占用布局位置；重新设为 `true` 会触发父容器重排。
+- `scroll_y` / `scroll_height` 可读写滚动位置和内容总高度。
+
 ### 9.3 字体和颜色
 
 ```agui
@@ -470,7 +496,7 @@ entry.bg = "#FFFFFF"
 - `font(family, size, bold=false, italic=false)`，`size` 单位是磅。
 - 颜色支持 `#RRGGBB`、`#RGB` 和 `white`、`black`、`red`、`green`、`blue`、`gray`、`orange`、`yellow`。
 - `fg` 是文字颜色，`bg` 是背景颜色。
-- 经典 Win32 按钮对 `fg` / `bg` 的支持有限，建议主要给标签、输入框、列表和窗口设置颜色。
+- 给按钮设置 `fg` / `bg` 会自动切换为自绘按钮，颜色生效；其他原生控件（复选框、列表等）仍以系统主题为主。
 
 ### 9.4 窗口生命周期
 
@@ -904,10 +930,11 @@ Agui 借鉴了 Python 的缩进和部分语法，但不是 Python：
 - `import` 的运行时错误仍显示主文件行号；错误消息包含导入文件路径，但没有独立源码映射。
 - 菜单支持两级子菜单、真实快捷键和图标；没有动态插入/删除整段菜单的重建 API。
 - 富文本支持追加和字符/段落格式，不支持内嵌图片、表格、超链接。
-- 表格支持编辑和排序，但没有虚拟化、多选、列宽拖拽保存、分组。
+- 表格支持编辑、排序和编辑事件，但没有虚拟化、多选、列宽拖拽保存、分组。
 - treeview 没有拖拽节点、多选；canvas 没有贝塞尔曲线、图片、路径填充。
 - 自绘按钮支持纯色背景/文字色，没有渐变、圆角和图标。
-- 后台任务与 GUI 共享解释器锁；长任务执行时 UI 事件会等待。
+- 布局容器支持纵向、网格、锚点和滚动，但没有百分比尺寸、flex 权重和自动换行的水平流式布局。
+- 异步任务是协作式的：CPU 密集脚本会在语句间让出，但单条不可中断的原生调用返回前无法响应取消。
 - `screenshot()` 默认截活动窗口，多窗口时需要传窗口对象。
 - 自签名 exe 只能建立本机信任；SmartScreen 声誉需要正式证书和时间。
 
@@ -1097,9 +1124,9 @@ t.end_edit(true)          # 提交；false 取消
 | `end_edit(save=true)` | 提交或取消当前编辑 |
 | `editable` | 是否允许双击编辑 |
 
-单击列头会按该列排序；双击单元格进入编辑，Enter 或失焦提交，Esc 取消。
+单击列头会按该列排序；双击单元格进入编辑，Enter 或失焦提交，Esc 取消。编辑框会被裁剪在表格可见区域内，行号越界时 `edit_cell` 直接返回。修改 `headers` 会保留已有行数据。
 
-事件：`select`、`click`、`dblclick`。双击事件在 `dblclick` 处理器里可以读取 `t.selected`。
+事件：`select`、`click`、`dblclick`、`edit`。`edit` 在单元格保存后触发，可以用 `t.selected` 和 `t.get_cell(...)` 读取结果。
 
 ### 16.9 视觉样式与自绘按钮
 
@@ -1114,7 +1141,7 @@ button("删除", fg="#FFFFFF", bg="#DC2626", w=140)
 
 自绘按钮保留键盘焦点、默认按钮外框和禁用态；目前只支持纯色背景，不支持渐变/圆角。
 
-### 16.10 后台任务与递归上限
+### 16.10 后台任务、取消与递归上限
 
 ```agui
 func work():
@@ -1124,15 +1151,23 @@ func work():
 func done():
     label_status.text = "加载完成"
 
-async(work, then=done)
+t = async(work, then=done)
+print(t.status)       # running
+print(t.wait(2))      # true
+print(t.result)       # done
 ```
 
-`async(work, then=callback)`：
+`async(work, then=callback)` 返回 `task` 对象：
 
-- `work` 在后台 goroutine 执行；完成后 `then` 被投递回 UI 线程执行。
-- 出错时弹出错误对话框；`then` 不会执行。
+- `work` 在后台 goroutine 中**协作式**执行；每执行若干语句会主动让出解释器锁，因此后台做计算时 UI 事件仍能响应。
+- 完成后 `then` 被投递回 UI 线程；出错时报告错误，`then` 不执行。
 - 不要在 `work` 里直接修改控件；更新界面放在 `then`。
-- 后台任务和 UI 共享解释器锁，长任务期间 UI 事件会等待。
+- `task.status`：`running`、`done`、`failed`、`cancelled`。
+- `task.wait(timeout=5)`：等待完成，返回是否已完成；`0` 表示无限等待。
+- `task.cancel()`：请求取消；在 `sleep`、文件、HTTP 等可让出位置会尽快抛出“已取消”。
+- `task.result` / `task.error`：结果或错误信息。
+
+> 注意：单条不可中断的原生调用（例如一个很慢的同步函数）只有在返回后才会响应取消；程序退出时 Agui 会取消所有未完成任务，最多等待约 2 秒。
 
 递归深度可调：
 
@@ -1148,9 +1183,12 @@ set_recursion_limit(200)       # 范围 8..100000，返回旧值
 ```powershell
 agui init demo                 # 生成 demo/main.ag 模板
 agui run app.ag --debug        # 打印事件日志，出错时输出全局变量
-agui build app.ag -o app.exe --icon assets\app.ico `
+agui build app.ag -o app.exe --icon assets\app.ico --asset assets --asset data\config.json `
   --product "我的工具" --company "Agui" --description "示例" --file-version 1.2.3.4
 ```
+
+- `--asset` 可重复；目录以目录名为虚拟前缀挂载，入口脚本同目录的 `.ag` 会自动包含。
+- 脚本里的 `import`、`read_file`、`image`、窗口图标、菜单图标优先读内嵌资源，再读磁盘。
 
 - `--debug` 设置 `AGUI_DEBUG=1`，`Widget.emit` 输出 `[debug] 事件 kind.event`；运行错误时把全局变量（排除原生函数）打印到 stderr。
 - 脚本里可以调用 `debug_vars()` 获取全局变量字典。
@@ -1294,4 +1332,100 @@ if r.ok:
 | `http_post(url, body="", headers=, timeout=15)` | POST |
 | `http_request(method, url, body="", headers=, timeout=15)` | 任意方法 |
 
-HTTP 响应最多读取 8 MB；网络错误会作为运行时错误抛出，可被 `try/catch` 捕获。
+HTTP 响应最多读取 8 MB；网络错误会作为运行时错误抛出，可被 `try/catch` 捕获。更完整的 HTTP 客户端（PUT/PATCH/DELETE、下载/上传、cookies、重试、代理、`raise=false`）见 16.21。
+
+### 16.19 布局容器：panel、scroll、grid
+
+```agui
+card = panel(x=20, y=20, w=360, h=220)
+label("账户", parent=card)
+edit("用户名", parent=card)
+button("保存", parent=card)
+
+list = scroll(x=400, y=20, w=300, h=220)
+for i in range(20):
+    label("第 " + str(i) + " 项", parent=list)
+
+pad = grid(cols=3, x=20, y=260, w=420, h=160)
+for k in ["7", "8", "9", "4", "5", "6"]:
+    button(k, parent=pad)
+
+ok = button("确定", anchor="right bottom", x=20, y=20, w=120, h=36)
+```
+
+- `panel()`：无滚动容器，适合卡片、分区。
+- `scroll()`：带垂直滚动条，支持鼠标滚轮和 `scroll_y` 属性；内容超出高度时自动出现滚动条。
+- `grid(cols=2)`：按列数从左到右、从上到下排列子控件，行高取该行最高控件。
+- 容器可嵌套：panel 里可以放 groupbox、scroll、grid，groupbox 里也可以放 panel。
+- `anchor` 支持 `left`、`right`、`top`、`bottom` 及其组合；`right bottom` 贴右下，`left right` 横向拉伸，`top bottom` 纵向拉伸。
+- `visible=false` 的控件不显示也不占位；恢复显示会重新布局父容器。
+- 修改容器尺寸或窗口缩放会触发递归重排。
+
+### 16.20 GUI 补充控件
+
+```agui
+win = window("补充控件", 720, 620, center=true, opacity=1.0)
+statusbar("就绪\tDPI 自动\tAgui 0.5")
+
+radio("标准", checked=true)
+radio("紧凑")
+
+date("2026-11-01")
+time("15:30:00")
+
+button("悬停查看提示", tooltip="这是一个原生 tooltip")
+```
+
+- `radio(text, checked=false, ...)`：单选按钮；同组单选需要自行用 `parent` 放进同一个容器，事件为 `click` / `change`。
+- `statusbar(text)`：底部状态栏，用 `\t` 分段，自动停靠在窗口底部；属性 `text` / `parts`，事件 `click` / `dblclick`。
+- `date(value="")` / `time(value="")`：原生日期/时间选择器；日期接受 `YYYY-MM-DD`，时间接受 `HH:MM` 或 `HH:MM:SS`；只写时间时日期补为今天。属性 `text` / `value`，方法 `set_value()` / `today()`，事件 `change`。
+- `tooltip` 可作为任意控件的通用属性（`button(..., tooltip="提示")` 或 `w.tooltip = "提示"`），使用原生 tooltips_class32；自动化测试可调用 `w.hover()` 显示提示，并用 `w.tooltip_visible` 断言。
+- 窗口属性：`center=true` 启动时居中；`topmost` 置顶；`opacity` 0.0–1.0；`state` 为 `normal` / `maximized` / `minimized`；方法 `center()`、`flash()`。
+- 状态栏、日期、时间、单选按钮同样参与自动布局；状态栏不占纵向流。
+
+### 16.21 HTTP 客户端增强
+
+```agui
+r = http_get("https://example.com", timeout=10, retry=2, raise=false)
+print(r.status, r.ok, r.content_type, r.length)
+
+r = http_json("https://api.example.com/items", {"name": "Agui"})
+print(r.json)
+
+http_download("https://example.com/logo.png", "logo.png")
+http_upload("https://example.com/upload", files={"file": "logo.png"})
+
+print(url_parse("https://example.com/a?x=1"))
+```
+
+- 方法：`http_get`、`http_post`、`http_put`、`http_patch`、`http_delete`、`http_head`、`http_request`；`http_json(url, data, method="POST")` 自动 JSON 编码。
+- 通用关键字参数：`headers`、`timeout`（秒，默认 15）、`cookies`、`auth=[用户名, 密码]`、`follow_redirects`、`max_redirects`、`proxy`、`insecure`、`retry`、`retry_delay`、`raise`。
+- 请求体可以用 `body`、`json`、`form` 或 `files`；`http_download` 把响应原样写入文件，`http_upload` 以 multipart POST 上传。
+- 返回字典：`status`、`ok`、`body`、`headers`、`url`、`content_type`、`length`、`elapsed`、`cookies`、`json`。HTTP 4xx/5xx 默认抛错；`raise=false` 时返回带 `error` 的字典。
+- 响应体上限 32 MB；请求会释放解释器锁，放在 `async` 中不会冻结界面。
+- URL 工具：`url_encode`、`url_decode`、`query_encode(dict)`、`url_parse(url)`。
+
+### 16.22 WebSocket 客户端
+
+```agui
+ws = ws_connect("ws://127.0.0.1:8765", timeout=5)
+print(ws.connected, ws.url)
+
+on ws.message:
+    print("收到", ws.message, "类型", ws.type)
+    ws.close()
+
+on ws.close:
+    print("连接关闭")
+
+ws.send("hello")
+t = async(lambda: sleep(3000))
+t.wait(5)
+```
+
+- `ws_connect(url, headers=, timeout=15, protocols=, origin=, insecure=false)` 建立 RFC6455 客户端连接，支持 `ws://` 与 `wss://`。
+- 事件：`open`、`message`、`close`、`error`；`message` 事件里读 `ws.message` / `ws.text` / `ws.data`，`ws.type` 为 `text` 或 `binary`。
+- 方法：`send()` / `send_text()`、`send_binary()`、`recv(timeout=5)`（同步等待一条消息）、`ping()`、`close()`。
+- 属性：`url`、`protocol`、`connected`、`closed`、`message`、`type`、`count`、`last_error`。
+- 无窗口（命令行）脚本也能收到事件；GUI 脚本的事件回调会回到 UI 线程。
+- 服务端示例可用 `scripts/ws_echo.py`（依赖 Python websockets）或任意 echo 服务。

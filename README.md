@@ -1,6 +1,6 @@
 # Agui：为 Windows GUI 而生的解释型语言
 
-Agui 是一门轻量、解释执行的脚本语言。它用接近 Python 的缩进语法，直接创建**原生 Windows 控件**，不需要 Electron、浏览器或额外运行时。解释器本身由 Go + Win32 API 写成，最终产物是一个可以双击运行的独立 `.exe`。
+Agui 是一门轻量、解释执行的脚本语言。它用接近 Python 的缩进语法，直接创建**原生 Windows 控件**，不需要 Electron、浏览器或额外运行时。解释器本身由 Go + Win32 API 写成，最终产物是一个可以双击运行的独立 `.exe`。当前版本 **0.5.0**。
 
 ![Agui 窗口示例](docs/images/hello.png)
 
@@ -34,12 +34,13 @@ on win.close:
 - **自绘彩色按钮**：按钮的 `fg` / `bg` 真正生效，支持自定义文字色、背景色和默认按钮样式。
 - **类 Python 语法**：缩进代码块、`if/elif/else`、`while/for`、`func`、闭包、切片（含步长）、单行/多行 lambda、`try/catch/finally`、`raise`、`import`、轻量 `class`。
 - **事件即语法**：`on btn.click:` 注册点击事件，代码结构一眼可见。
-- **后台任务**：`async(work, then=...)` 在后台线程运行耗时逻辑，完成后回到 UI 线程更新界面。
-- **省心布局**：不写坐标就自动纵向排列；写了 `x/y/w/h` 就精确控制；窗口缩放时自动重排。
+- **后台任务**：`async(work, then=...)` 返回可等待、可取消的 `task`；任务在后台协作式运行，完成后回到 UI 线程更新界面。
+- **布局容器**：`panel` / `scroll` / `grid` 可嵌套，支持明确锚点、滚动和网格排列；隐藏控件不占位。
+- **省心布局**：不写坐标就自动纵向排列；写了 `x/y/w/h` 就精确控制；`anchor=` 让控件贴在父容器边上；窗口缩放时自动重排。
 - **中文关键字别名**：`如果 / 否则 / 对于 / 在 / 函数 / 返回 / 监听 / 尝试 / 捕获 / 导入 / 匿名` 等可直接使用。
-- **单文件打包**：`agui build app.ag` 把脚本塞进 exe，双击即运行，不显示控制台；可嵌入图标和版本信息。
-- **内置实用库**：消息框、确认框、输入框、文件对话框、文件读写、剪贴板、定时器、截图、格式化字符串、JSON、base64、HTTP。
-- **更多控件**：groupbox 分组容器、treeview、canvas 画布、可编辑/可排序表格、菜单快捷键与图标、文件拖放。
+- **单文件打包**：`agui build app.ag` 把脚本和资源一起塞进 exe，双击即运行；可嵌入图标和版本信息。
+- **内置实用库**：消息框、确认框、输入框、文件对话框、文件读写、剪贴板、定时器、截图、格式化字符串、JSON、base64、HTTP、WebSocket。
+- **更多控件**：groupbox 分组容器、treeview、canvas 画布、可编辑/可排序表格、菜单快捷键与图标、文件拖放、radio、状态栏、日期/时间选择器、tooltip。
 - **无第三方依赖**：只用 Go 标准库和系统 DLL。
 
 | 计数器 | 表单 |
@@ -103,6 +104,16 @@ go build -ldflags "-H=windowsgui" -o aguiw.exe ./cmd/agui
 ```
 
 `(Get-Item .\hello.exe).VersionInfo` 可以查看嵌入的版本字段。
+
+把图片、数据文件和 `.ag` 模块一起打包：
+
+```powershell
+.\agui.exe build app.ag -o app.exe --asset assets --asset data\config.json
+```
+
+- `--asset` 可以重复；目录会以目录名作为虚拟前缀挂载（如 `assets/logo.png`），入口脚本同目录下的所有 `.ag` 会自动包含，便于 `import`。
+- 脚本里的 `read_file`、`image`、`window(icon=...)`、`menu.item(icon=...)` 会优先读取内嵌资源，找不到再读磁盘。
+- 资源图片需要真实路径给 GDI+ 时，运行时会解压到用户缓存目录；不可写时退回程序目录的 `.agui-cache`。
 
 `agui build` 会把脚本追加到 `aguiw.exe`（无控制台）之后；找不到 `aguiw.exe` 时会退回控制台版并给出提示。加 `-console` 可以强制使用控制台版，方便看 `print` 输出。
 
@@ -240,7 +251,7 @@ on status.click:
     print("状态栏：", status.checked)
 ```
 
-`menu.item(文字, 回调?, accel=, checkable=, checked=, enabled=)` 返回菜单项；`submenu()` 创建子菜单，`separator()` 创建分隔线。`accel` 只是显示在右侧的快捷键文本，不会自动注册全局热键；`checkable` 项点击时自动翻转 `checked`。`&` 后面的字母是 Alt 访问键。
+`menu.item(文字, 回调?, accel=, checkable=, checked=, enabled=, icon=)` 返回菜单项；`submenu()` 创建子菜单，`separator()` 创建分隔线。`accel` 会注册为真实快捷键（如 `"Ctrl+O"`、`"F5"`），菜单右侧同时显示快捷键文本；`checkable` 项点击时自动翻转 `checked`；`icon=` 指定 png/jpg 菜单图标。`&` 后面的字母是 Alt 访问键。
 
 ### 自动布局与精确定位
 
@@ -259,6 +270,29 @@ button("右下角", x=360, y=300, w=140, h=36)
 - 不写 `y`：按创建顺序自动向下排列。
 - 不写 `w`：标签、输入框、复选框、列表、进度条、滑块会自动占满可用宽度；按钮默认 150，下拉框默认 260。
 - 窗口缩放时，自动布局的控件会重新排列。
+- `anchor="right bottom"` 让控件贴在父容器右边/底边；同时写 `left right` 或 `top bottom` 会拉伸。
+- `visible=false` 的控件不参与布局，不占位置。
+
+容器让复杂界面保持可组合：
+
+```agui
+card = panel(x=20, y=20, w=360, h=220)
+label("账户", parent=card)
+edit("用户名", parent=card)
+check = checkbox("记住我", parent=card)
+
+side = scroll(x=400, y=20, w=300, h=220)
+for i in range(20):
+    label("列表项 " + str(i), parent=side)
+
+keys = grid(cols=3, x=20, y=260, w=420, h=160)
+for k in ["7", "8", "9", "4", "5", "6"]:
+    button(k, parent=keys)
+
+fabs = button("确定", anchor="right bottom", x=20, y=20, w=120, h=36)
+```
+
+`panel` 是无滚动容器，`scroll` 带垂直滚动条和滚轮事件，`grid` 按 `cols` 排列子控件。它们都可以嵌套 groupbox，也可以再嵌套同类容器。
 
 ### 多窗口、图片与表格
 
@@ -303,11 +337,14 @@ on win.close:
 | `image(src, fit=true)` | png/jpg 图片 | `w`, `h`, `fit`, `bg` |
 | `table(headers, rows)` | 表格（ListView） | `headers`, `rows`, `selected`, `editable` |
 | `groupbox(text)` | 分组容器；子控件用 `parent=group` | `parent`, `h` |
+| `panel()` | 无滚动布局容器 | `parent`, `anchor` |
+| `scroll()` | 带垂直滚动条的容器 | `parent`, `h`, `scroll_y` |
+| `grid(cols=2)` | 网格布局容器 | `cols`, `parent` |
 | `tree(items)` | 树形控件 | `items`, `h` |
 | `canvas(w=, h=)` | 自绘画布 | `bg`, `h` |
 | `font("微软雅黑", 14, bold=true)` | 创建字体 | `family`, `size`, `bold`, `italic` |
 
-所有控件都接受这些公共参数：`x`, `y`, `w`, `h`, `fg`, `bg`, `font`, `enabled`, `visible`。
+所有控件都接受这些公共参数：`x`, `y`, `w`, `h`, `fg`, `bg`, `font`, `enabled`, `visible`, `anchor`, `parent`（容器/窗口）。
 
 ### 常用属性
 
@@ -398,6 +435,27 @@ on list.select:
 
 ---
 
+## 0.5 新增能力速览
+
+- **GUI 补齐**：`radio` 单选按钮、`statusbar` 底部状态栏、`date` / `time` 原生日期时间选择器、任意控件 `tooltip`。
+- **窗口控制**：`center`、`topmost`、`opacity`、`state`，以及 `center()` / `flash()`；多窗口同样适用。
+- **HTTP 增强**：`http_put/patch/delete/head`、`http_json`、`http_download`、`http_upload`，以及 headers/cookies/auth/重定向/代理/超时/重试/`raise=false` 和 URL 工具。
+- **WebSocket 客户端**：`ws_connect()`，支持 `open/message/close/error` 事件、文本/二进制帧、分片、ping/pong 和 `recv()`。
+- **测试**：新增 HTTP 扩展与 WebSocket 事件回归测试；解析器允许 `raise=` 作为关键字参数。
+
+![补充控件示例](docs/images/gui_extras.png)
+
+---
+
+## 0.4 新增能力速览
+
+- **异步任务对象**：`async()` 返回 `task`，支持 `status`、`cancel()`、`wait()`、`result`；任务使用协作式调度，后台计算期间界面仍可响应，退出时会取消未完成任务。
+- **资源/模块打包**：`agui build --asset 目录或文件` 把图片、数据文件和 `.ag` 模块一起嵌进 exe；`import`、`read_file`、`image`、窗口图标、菜单图标都优先读取内嵌资源。
+- **布局引擎**：新增 `panel`、`scroll`、`grid` 容器，支持嵌套、`anchor="right bottom"`、隐藏控件不占位、滚动容器和网格排列。
+- **表格增强**：修改 `headers` 不再清空行；编辑时会校验行号并把编辑框裁剪在可见区域；保存单元格后触发 `edit` 事件。
+
+---
+
 ## 0.3 新增能力速览
 
 - **语言**：`class` 轻量类、多行 lambda、`try/catch/finally`、`raise`、切片步长 `[lo:hi:step]`。
@@ -448,7 +506,7 @@ print(person.get("age", 0))     # 0
 
 `read_file`, `write_file`, `append_file`, `file_exists`, `delete_file`, `list_dir`, `mkdir`, `basename`, `dirname`, `join_path`, `abs_path`, `cwd`
 
-### JSON、base64 与 HTTP
+### JSON、base64、HTTP 与 WebSocket
 
 ```agui
 data = {"name": "Agui", "items": [1, 2, 3]}
@@ -458,11 +516,27 @@ print(json_decode(text).name)
 print(base64_encode("hello"))
 print(base64_decode("aGVsbG8="))
 
-r = http_get("https://example.com", timeout=10)
-print(r.status, r.ok, r.headers["Content-Type"])
+r = http_get("https://example.com", timeout=10, retry=2, raise=false)
+print(r.status, r.ok, r.content_type, r.length)
+
+r = http_json("https://api.example.com/items", {"name": "Agui"})
+print(r.json)
+
+http_download("https://example.com/logo.png", "logo.png")
+print(url_parse("https://example.com/a?x=1"))
+
+ws = ws_connect("ws://127.0.0.1:8765", timeout=5)
+on ws.message:
+    print("收到", ws.message, ws.type)
+    ws.close()
+ws.send("hello")
 ```
 
-`json_encode(v, pretty=false)`、`json_decode(s)`、`base64_encode(s, urlsafe=false)`、`base64_decode(s, urlsafe=false)`、`http_get(url, headers=, timeout=15)`、`http_post(url, body="", headers=, timeout=15)`、`http_request(method,url,body="",headers=,timeout=15)`。HTTP 返回 `{status, ok, body, headers, url}`，最多读取 8 MB；网络错误可被 `try/catch` 捕获。HTTP 是同步调用，界面会等待，长请求建议放进 `async`。
+`json_encode(v, pretty=false)`、`json_decode(s)`、`base64_encode(s, urlsafe=false)`、`base64_decode(s, urlsafe=false)`。
+
+HTTP：`http_get`、`http_post`、`http_put`、`http_patch`、`http_delete`、`http_head`、`http_request`、`http_json(url,data,method="POST")`、`http_download(url,path)`、`http_upload(url,files=)`；通用参数 `headers=, timeout=, cookies=, auth=, follow_redirects=, max_redirects=, proxy=, insecure=, retry=, retry_delay=, raise=`。返回 `{status, ok, body, headers, url, content_type, length, elapsed, cookies, json}`；4xx/5xx 默认抛错，`raise=false` 返回带 `error` 的字典。URL 工具：`url_encode`、`url_decode`、`query_encode`、`url_parse`。
+
+WebSocket：`ws_connect(url, headers=, timeout=15, protocols=, origin=, insecure=false)`；事件 `open/message/close/error`；方法 `send`、`send_binary`、`recv(timeout=5)`、`ping`、`close`；属性 `connected`、`closed`、`message`、`type`、`count`、`last_error`。详见 [docs/language.md](docs/language.md) 16.21/16.22。
 
 ### 对话框与剪贴板
 
@@ -494,7 +568,11 @@ every(500, refresh)   # 每 0.5 秒执行
 cancel_timer(id)      # 取消定时器
 screenshot("shot.png")
 
-async(work, then=done) # work 在后台线程执行，done 回到 UI 线程
+async(work, then=done) # work 在后台协作式执行，done 回到 UI 线程
+t = async(work)        # 返回 task 对象
+print(t.status)        # running / done / failed / cancelled
+t.wait(2)              # 最多等 2 秒
+t.cancel()             # 请求取消
 set_recursion_limit(200)
 print(get_recursion_limit())
 ```
@@ -503,10 +581,11 @@ print(get_recursion_limit())
 
 ```agui
 after(500, lambda: msgbox("半秒到了"))
-async(lambda: read_file("big.txt"), then=lambda: msgbox("读取完成"))
+t = async(lambda: read_file("big.txt"), then=lambda: msgbox("读取完成"))
+print(t.wait(5), t.status)
 ```
 
-后台任务里不要直接操作控件；把界面更新放在 `then` 回调里。后台任务持有一段解释器锁，GUI 事件在长任务执行期间会等待，所以后台函数应只做计算或 IO。
+后台任务里不要直接操作控件；把界面更新放在 `then` 回调里。任务与解释器共享执行权，但会在语句之间主动让出，所以后台做 CPU 计算时窗口仍能响应；如果任务卡在无法让出的单条原生调用里，取消要等该调用返回。退出时未完成任务会被取消，最多等待约 2 秒。
 
 ### 命令行参数
 
@@ -537,6 +616,7 @@ print(script_path)    # 脚本路径；打包后为 "内置脚本"
 | [menu_accel.ag](examples/menu_accel.ag) | 真实快捷键 Ctrl+O |
 | [menu_icon.ag](examples/menu_icon.ag) | 菜单项图标 |
 | [drop_test.ag](examples/drop_test.ag) | 文件拖放事件（模拟） |
+| [layout.ag](examples/layout.ag) | panel/scroll/grid 嵌套、锚点与隐藏控件 |
 | [lang2.ag](examples/lang2.ag) | class、finally、raise、块 lambda、步长切片 |
 | [windows.ag](examples/windows.ag) | 运行时创建独立窗口与从属窗口 |
 | [lang_features.ag](examples/lang_features.ag) | 切片、lambda、try/catch、import |
@@ -545,6 +625,9 @@ print(script_path)    # 脚本路径；打包后为 "内置脚本"
 | [calculator.ag](examples/calculator.ag) | 计算器：四则运算、连续运算、除零提示 |
 | [event_test.ag](examples/event_test.ag) | 自动触发点击事件，便于验证 |
 | [bundle_test.ag](examples/bundle_test.ag) | 打包成 exe 后自截图并退出 |
+| [http.ag](examples/http.ag) | HTTP GET、状态/耗时/响应体读取 |
+| [websocket.ag](examples/websocket.ag) | WebSocket 连接、消息事件与关闭 |
+| [gui_extras.ag](examples/gui_extras.ag) | radio、状态栏、日期/时间、tooltip、窗口控制 |
 
 `todo.ag` 的界面：
 
@@ -576,6 +659,10 @@ print(script_path)    # 脚本路径；打包后为 "内置脚本"
 | --- | --- |
 | ![GroupBox](docs/images/groupbox.png) | ![菜单图标](docs/images/menu_icon.png) |
 
+自动布局容器（panel / grid / scroll / anchor）：
+
+![布局容器](docs/images/layout.png)
+
 ---
 
 ## 项目结构
@@ -588,12 +675,13 @@ agui/
 │  ├─ lexer/            缩进敏感的扫描器
 │  ├─ ast/              语法树
 │  ├─ parser/           递归下降 + 运算符优先级
-│  ├─ lang/             值、环境、解释器、方法、内置函数、异步
-│  ├─ gui/              Win32 绑定、控件、消息循环、图片、富文本、表格
+│  ├─ lang/             值、环境、解释器、方法、内置函数、任务、资源包
+│  ├─ gui/              Win32 绑定、控件、布局容器、图片、富文本、表格、树、画布
 │  └─ winres/           PE 图标/版本资源写入
 ├─ examples/            示例脚本
 ├─ assets/              示例图片和图标
 ├─ scripts/sign.ps1     本机自签名脚本
+├─ scripts/ws_echo.py   WebSocket 回显示例服务
 ├─ docs/language.md     语言与 GUI API 参考
 ├─ docs/signing.md      代码签名说明
 ├─ build.bat            免 ExecutionPolicy 的构建入口
@@ -609,10 +697,11 @@ agui/
 - `import` 是文本级包含；运行时错误仍以主文件行号显示，错误消息里会包含导入文件路径，没有独立源码映射。
 - 菜单支持两级子菜单、真实快捷键与图标；没有动态插入/删除整段菜单的重建 API。
 - 富文本复杂排版（表格、图片、超链接）仍需要直接使用 Win32 消息。
-- 表格是基础 ListView 封装：支持编辑和排序，但没有虚拟化、多选、列宽拖拽保存、分组。
+- 表格支持编辑、排序和 `edit` 事件；没有虚拟化、多选、列宽拖拽保存、分组。
 - treeview 与 canvas 是基础封装：tree 没有拖拽节点/多选；canvas 没有贝塞尔曲线、图片、路径填充。
+- 布局容器支持纵向、网格、锚点和滚动；没有百分比尺寸、flex 权重和水平流式换行。
 - 自绘按钮支持纯色背景和文字色；渐变、圆角、图标需要后续扩展。
-- 后台函数与 GUI 共享解释器锁；后台长任务执行时 UI 事件会等待。不要跨线程直接操作控件。
+- 异步任务是协作式的：CPU 密集脚本会在语句间让出，但单条不可中断的原生调用返回前无法响应取消。
 - `screenshot()` 截取的是指定窗口（默认活动窗口）；多窗口时请传窗口对象。
 - 生成的 exe 未签名时可能触发 SmartScreen；自签名只能缓解本地信任，不能建立 SmartScreen 声誉。
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"agui/internal/lang"
@@ -40,6 +41,15 @@ type Widget struct {
 	fullWidth  bool
 	defW       int32
 	gap        int32
+
+	// Container/layout state.
+	hidden   bool
+	anchor   string
+	gridCols int
+	scrollY  int32
+	scrollH  int32
+
+	groupOldProc uintptr
 
 	title  string
 	bgSpec string
@@ -78,26 +88,38 @@ type Widget struct {
 	canvasOps []canvasOp
 	mouseX    float64
 	mouseY    float64
+
+	// Extra controls (statusbar/date/time/tooltip).
+	statusParts    []string
+	dateValue      time.Time
+	tooltip        string
+	tooltipInfo    toolInfoW
+	tooltipTracked bool
+	opacity        float64
 }
 
 // Kind implements lang.Widget.
 func (w *Widget) Kind() string { return w.kind }
 
 var validEvents = map[string]map[string]bool{
-	"window":   {"close": true, "resize": true, "drop": true},
-	"label":    {"click": true, "dblclick": true},
-	"button":   {"click": true},
-	"checkbox": {"click": true, "change": true},
-	"edit":     {"change": true},
-	"richedit": {"change": true, "click": true},
-	"listbox":  {"select": true, "dblclick": true},
-	"combo":    {"select": true, "change": true, "dblclick": true},
-	"slider":   {"change": true},
-	"progress": {},
-	"image":    {"click": true, "dblclick": true},
-	"table":    {"select": true, "click": true, "dblclick": true},
-	"tree":     {"select": true, "expand": true, "dblclick": true},
-	"canvas":   {"click": true},
+	"window":    {"close": true, "resize": true, "drop": true},
+	"label":     {"click": true, "dblclick": true},
+	"button":    {"click": true},
+	"checkbox":  {"click": true, "change": true},
+	"radio":     {"click": true, "change": true},
+	"statusbar": {"click": true, "dblclick": true},
+	"date":      {"change": true},
+	"time":      {"change": true},
+	"edit":      {"change": true},
+	"richedit":  {"change": true, "click": true},
+	"listbox":   {"select": true, "dblclick": true},
+	"combo":     {"select": true, "change": true, "dblclick": true},
+	"slider":    {"change": true},
+	"progress":  {},
+	"image":     {"click": true, "dblclick": true},
+	"table":     {"select": true, "click": true, "dblclick": true, "edit": true},
+	"tree":      {"select": true, "expand": true, "dblclick": true},
+	"canvas":    {"click": true},
 }
 
 // Listen implements lang.Widget.
@@ -131,22 +153,23 @@ func (a *App) addChild(kind, class, text string, style uint32, full bool, defW, 
 		a.pendingParent = nil
 	}
 	cr, _ := getClientRect(container.hwnd)
-	margin := a.margin
-	if container.kind == "groupbox" {
-		margin = a.px(12)
-	}
+	margin := a.containerMargin(container.kind)
 	gap := a.gap
 
 	autoX := xv == nil
 	autoY := yv == nil
 	autoW := wv == nil
+	fullWidth := full
+	if kind == "label" && xv != nil {
+		fullWidth = false
+	}
 	x := margin
 	if !autoX {
 		x = *xv
 	}
 	y := container.layoutY
-	if container.kind == "groupbox" && y == 0 {
-		y = a.px(26)
+	if y == 0 {
+		y = a.containerStart(container.kind)
 	}
 	if !autoY {
 		y = *yv
@@ -154,7 +177,7 @@ func (a *App) addChild(kind, class, text string, style uint32, full bool, defW, 
 	width := defW
 	if !autoW {
 		width = *wv
-	} else if full {
+	} else if fullWidth {
 		width = cr.right - x - margin
 		if width < a.px(40) {
 			width = a.px(40)
@@ -195,7 +218,7 @@ func (a *App) addChild(kind, class, text string, style uint32, full bool, defW, 
 		autoX:     autoX,
 		autoY:     autoY,
 		autoW:     autoW,
-		fullWidth: full,
+		fullWidth: fullWidth,
 		defW:      defW,
 		gap:       gap,
 		handlers:  map[string][]func() error{},
@@ -209,14 +232,51 @@ func (a *App) addChild(kind, class, text string, style uint32, full bool, defW, 
 	return w, nil
 }
 
+func (w *Widget) topWindow() *Widget {
+	for w != nil && w.kind != "window" {
+		w = w.parent
+	}
+	return w
+}
+
 func (a *App) createLabel(text string, x, y, w, h *int32) (*Widget, error) {
 	style := uint32(ssLeft | ssNoPrefix | ssNotify)
-	return a.addChild("label", "STATIC", text, style, true, 0, a.px(24), x, y, w, h)
+	return a.addChild("label", "STATIC", text, style, true, a.px(300), a.px(24), x, y, w, h)
 }
 
 func (a *App) createGroupBox(text string, x, y, w, h *int32) (*Widget, error) {
 	style := uint32(bsGroupBox)
-	return a.addChild("groupbox", "BUTTON", text, style, true, 0, a.px(140), x, y, w, h)
+	widget, err := a.addChild("groupbox", "BUTTON", text, style, true, 0, a.px(140), x, y, w, h)
+	if err != nil {
+		return nil, err
+	}
+	widget.groupOldProc = setWindowLong(widget.hwnd, gwlWndProc, groupboxProcCallback)
+	return widget, nil
+}
+
+// createPanel creates a layout container. kind is "panel", "scroll" or "grid";
+// groupbox is created by createGroupBox because it uses the BUTTON class.
+func (a *App) createPanel(kind string, cols int, x, y, w, h *int32) (*Widget, error) {
+	style := uint32(wsClipChildren)
+	if kind == "scroll" {
+		style |= wsVScroll
+	}
+	defH := a.px(140)
+	switch kind {
+	case "scroll":
+		defH = a.px(180)
+	case "grid":
+		defH = a.px(160)
+	}
+	widget, err := a.addChild(kind, panelClassName, "", style, true, 0, defH, x, y, w, h)
+	if err != nil {
+		return nil, err
+	}
+	if cols < 1 {
+		cols = 2
+	}
+	widget.gridCols = cols
+	return widget, nil
 }
 
 func (a *App) createButton(text string, x, y, w, h *int32) (*Widget, error) {
@@ -360,6 +420,21 @@ func (w *Widget) GetProp(name string) (lang.Value, bool) {
 		return isWindowEnabled(w.hwnd), true
 	case "visible":
 		return isWindowVisible(w.hwnd), true
+	case "anchor":
+		return w.anchor, true
+	case "scroll_y":
+		return w.app.logical(w.scrollY), true
+	case "scroll_height":
+		return w.app.logical(w.scrollH), true
+	case "tooltip":
+		return w.tooltip, true
+	case "tooltip_visible":
+		return w.tooltipVisible(), true
+	case "tooltip_tools":
+		if w.app.tooltipHwnd == 0 {
+			return float64(0), true
+		}
+		return float64(sendMessage(w.app.tooltipHwnd, ttmGetToolCount, 0, 0)), true
 	}
 	switch w.kind {
 	case "window":
@@ -377,13 +452,31 @@ func (w *Widget) GetProp(name string) (lang.Value, bool) {
 				out.Items = append(out.Items, p)
 			}
 			return out, true
+		case "state":
+			return w.windowState(), true
+		case "topmost":
+			return w.isTopmost(), true
+		case "opacity":
+			return w.opacity, true
 		}
-	case "label", "button", "checkbox", "edit", "richedit":
+	case "label", "button", "checkbox", "radio", "edit", "richedit":
 		if name == "text" {
 			return getWindowText(w.hwnd), true
 		}
-		if name == "checked" && w.kind == "checkbox" {
+		if name == "checked" && (w.kind == "checkbox" || w.kind == "radio") {
 			return sendMessage(w.hwnd, bmGetCheck, 0, 0) == bstChecked, true
+		}
+	case "statusbar":
+		switch name {
+		case "text":
+			return w.title, true
+		case "parts":
+			return w.statusPartsValue(), true
+		}
+	case "date", "time":
+		switch name {
+		case "text", "value":
+			return w.dateText(), true
 		}
 	case "listbox", "combo":
 		switch name {
@@ -602,11 +695,29 @@ func (w *Widget) SetProp(name string, v lang.Value) error {
 		enableWindow(w.hwnd, lang.Truthy(v))
 		return nil
 	case "visible":
+		w.hidden = !lang.Truthy(v)
 		if lang.Truthy(v) {
 			showWindow(w.hwnd, swShow)
 		} else {
 			showWindow(w.hwnd, swHide)
 		}
+		if w.parent != nil {
+			w.app.layoutContainer(w.parent, w.parent.w, w.parent.h)
+		}
+		return nil
+	case "anchor":
+		w.anchor = lang.ToString(v)
+		if w.parent != nil {
+			w.app.layoutContainer(w.parent, w.parent.w, w.parent.h)
+		}
+		return nil
+	case "scroll_y":
+		f, ok := v.(float64)
+		if !ok {
+			return fmt.Errorf("scroll_y 必须是数字")
+		}
+		w.scrollY = w.app.px(f)
+		w.app.layoutContainer(w, w.w, w.h)
 		return nil
 	case "font":
 		f, ok := v.(*lang.Font)
@@ -660,6 +771,9 @@ func (w *Widget) SetProp(name string, v lang.Value) error {
 		}
 		invalidateRect(w.hwnd, nil, true)
 		return nil
+	case "tooltip":
+		w.setTooltip(lang.ToString(v))
+		return nil
 	}
 
 	switch w.kind {
@@ -671,6 +785,27 @@ func (w *Widget) SetProp(name string, v lang.Value) error {
 			return nil
 		case "icon":
 			return w.setWindowIcon(lang.ToString(v))
+		case "center":
+			if lang.Truthy(v) {
+				w.centerWindow()
+			}
+			return nil
+		case "topmost":
+			w.setTopmost(lang.Truthy(v))
+			return nil
+		case "opacity":
+			f, ok := v.(float64)
+			if !ok {
+				return fmt.Errorf("opacity 必须是 0 到 1 的数字")
+			}
+			return w.setOpacity(f)
+		case "state":
+			return w.setWindowState(lang.ToString(v))
+		case "flash":
+			if lang.Truthy(v) {
+				w.flashWindow()
+			}
+			return nil
 		}
 	case "image":
 		switch name {
@@ -722,13 +857,33 @@ func (w *Widget) SetProp(name string, v lang.Value) error {
 			w.editable = lang.Truthy(v)
 			return nil
 		}
-	case "label", "button", "checkbox", "edit", "richedit":
+	case "statusbar":
+		switch name {
+		case "text":
+			w.title = lang.ToString(v)
+			parts := strings.Split(w.title, "\t")
+			w.setStatusParts(parts)
+			return nil
+		case "parts":
+			items, err := toItems(v)
+			if err != nil {
+				return err
+			}
+			w.setStatusParts(items)
+			return nil
+		}
+	case "date", "time":
+		switch name {
+		case "text", "value":
+			return w.setDateText(lang.ToString(v))
+		}
+	case "label", "button", "checkbox", "radio", "edit", "richedit":
 		switch name {
 		case "text":
 			setWindowText(w.hwnd, lang.ToString(v))
 			return nil
 		case "checked":
-			if w.kind == "checkbox" {
+			if w.kind == "checkbox" || w.kind == "radio" {
 				val := uintptr(0)
 				if lang.Truthy(v) {
 					val = bstChecked
@@ -870,6 +1025,62 @@ func (w *Widget) CallMethod(name string, args []lang.Value, kwargs map[string]la
 			return nil, true, fmt.Errorf("icon(图片路径) 需要一个参数")
 		}
 		return nil, true, w.setWindowIcon(lang.ToString(args[0]))
+	case "topmost":
+		if w.kind != "window" {
+			return nil, true, fmt.Errorf("topmost 只能用于窗口")
+		}
+		w.setTopmost(len(args) == 0 || lang.Truthy(args[0]))
+		return nil, true, nil
+	case "opacity":
+		if w.kind != "window" {
+			return nil, true, fmt.Errorf("opacity 只能用于窗口")
+		}
+		v := lang.Pos(args, 0, float64(1))
+		f, ok := v.(float64)
+		if !ok {
+			return nil, true, fmt.Errorf("opacity(0~1) 需要数字")
+		}
+		return nil, true, w.setOpacity(f)
+	case "state":
+		if w.kind != "window" {
+			return nil, true, fmt.Errorf("state 只能用于窗口")
+		}
+		if len(args) == 0 {
+			return w.windowState(), true, nil
+		}
+		return nil, true, w.setWindowState(lang.ToString(args[0]))
+	case "flash":
+		if w.kind != "window" {
+			return nil, true, fmt.Errorf("flash 只能用于窗口")
+		}
+		w.flashWindow()
+		return nil, true, nil
+	case "tooltip", "set_tooltip":
+		w.setTooltip(lang.ToString(lang.Pos(args, 0, "")))
+		return nil, true, nil
+	case "parts":
+		if w.kind != "statusbar" {
+			return nil, true, fmt.Errorf("parts 只能用于 statusbar")
+		}
+		if len(args) == 0 {
+			return w.statusPartsValue(), true, nil
+		}
+		parts, err := toItems(args[0])
+		if err != nil {
+			return nil, true, err
+		}
+		w.setStatusParts(parts)
+		return nil, true, nil
+	case "set_value", "set_date":
+		if w.kind != "date" && w.kind != "time" {
+			return nil, true, fmt.Errorf("set_value 只能用于 date/time")
+		}
+		return nil, true, w.setDateText(lang.ToString(lang.Pos(args, 0, "")))
+	case "today", "now":
+		if w.kind == "date" || w.kind == "time" {
+			return nil, true, w.setDateText(time.Now().Format("2006-01-02 15:04:05"))
+		}
+		return nil, true, fmt.Errorf("today 只能用于 date/time")
 	case "load", "set_src":
 		if w.kind != "image" {
 			return nil, true, fmt.Errorf("load 只能用于 image")
@@ -1168,6 +1379,12 @@ func (w *Widget) CallMethod(name string, args []lang.Value, kwargs map[string]la
 	case "hide":
 		showWindow(w.hwnd, swHide)
 		return nil, true, nil
+	case "hover":
+		if w.tooltip == "" {
+			return nil, true, fmt.Errorf("控件没有 tooltip")
+		}
+		w.hoverTooltip()
+		return nil, true, nil
 	case "set_range":
 		if w.kind != "slider" && w.kind != "progress" {
 			return nil, true, fmt.Errorf("%s 没有范围", w.kind)
@@ -1304,7 +1521,11 @@ func (w *Widget) setWindowIcon(path string) error {
 	if w.kind != "window" {
 		return fmt.Errorf("icon 只能在窗口上设置")
 	}
-	img, _, _, err := loadGdiImage(path)
+	resolved, err := w.app.interp.AssetPath(path)
+	if err != nil {
+		return err
+	}
+	img, _, _, err := loadGdiImage(resolved)
 	if err != nil {
 		return err
 	}

@@ -2,6 +2,7 @@ package lang_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -393,5 +394,49 @@ print(p.status, p.body)
 	out, _ := runSource(t, src, nil)
 	if !strings.Contains(out, "200 true hello GET  yes") || !strings.Contains(out, "200 hello POST abc") {
 		t.Fatalf("输出 = %q", out)
+	}
+}
+
+func TestHTTPExtensions(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/json":
+			var m map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&m)
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Set-Cookie", "sid=abc; Path=/")
+			_ = json.NewEncoder(w).Encode(map[string]any{"echo": m, "method": r.Method})
+		case "/headers":
+			fmt.Fprintf(w, "%s|%s|%s", r.Header.Get("X-Test"), r.Header.Get("Cookie"), r.Header.Get("User-Agent"))
+		case "/download":
+			_, _ = w.Write([]byte{0, 1, 2, 255})
+		case "/fail":
+			http.Error(w, "nope", http.StatusInternalServerError)
+		default:
+			fmt.Fprintf(w, "ok")
+		}
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	src := fmt.Sprintf(`
+r = http_json(%q, {"a": 1, "b": "x"})
+print(r.status, r.json["echo"]["a"], r.json["method"], r.cookies["sid"])
+h = http_get(%q, headers={"X-Test": "yes"}, cookies={"sid": "cookie"})
+print(h.body)
+f = http_get(%q, raise=false)
+print(f.status, f.ok)
+d = http_download(%q, %q)
+print(d.status, d.size, d.path)
+u = url_parse("https://u:p@example.com:8080/a/b?q=1#f")
+print(u.host, u.port, u.path)
+`, srv.URL+"/json", srv.URL+"/headers", srv.URL+"/fail", srv.URL+"/download", filepath.Join(dir, "x.bin"))
+	out, _ := runSource(t, src, nil)
+	for _, want := range []string{"200 1 POST abc", "yes|sid=cookie|", "500 false", "4 " + filepath.Join(dir, "x.bin"), "example.com 8080 /a/b"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("输出缺少 %q：%q", want, out)
+		}
+	}
+	if b, err := os.ReadFile(filepath.Join(dir, "x.bin")); err != nil || len(b) != 4 || b[3] != 255 {
+		t.Fatalf("下载文件 = %v, %v", b, err)
 	}
 }

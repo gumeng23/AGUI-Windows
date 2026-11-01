@@ -8,7 +8,7 @@ import (
 
 var commonWidgetKw = []string{
 	"x", "y", "w", "h", "width", "height",
-	"fg", "bg", "font", "enabled", "visible", "parent",
+	"fg", "bg", "font", "enabled", "visible", "parent", "anchor", "tooltip",
 }
 
 // Register wires the GUI built-ins into an interpreter and returns the app that
@@ -23,7 +23,8 @@ func Register(i *lang.Interp) *App {
 		if err := lang.CheckArity("window", args, 3); err != nil {
 			return nil, err
 		}
-		if err := checkKw(kwargs, "title", "w", "width", "h", "height", "bg", "resizable", "icon", "parent"); err != nil {
+		if err := checkKw(kwargs, "title", "w", "width", "h", "height", "bg", "resizable", "icon", "parent",
+			"center", "topmost", "opacity", "state"); err != nil {
 			return nil, err
 		}
 		var parent *Widget
@@ -57,6 +58,26 @@ func Register(i *lang.Interp) *App {
 		}
 		if icon := kwStr(kwargs, "icon", ""); icon != "" {
 			if err := w.setWindowIcon(icon); err != nil {
+				return nil, err
+			}
+		}
+		if kwBool(kwargs, "center", false) {
+			w.centerWindow()
+		}
+		if kwBool(kwargs, "topmost", false) {
+			w.setTopmost(true)
+		}
+		if v, ok := kwargs["opacity"]; ok {
+			f, err := numArg(v, "opacity")
+			if err != nil {
+				return nil, err
+			}
+			if err := w.setOpacity(f); err != nil {
+				return nil, err
+			}
+		}
+		if state := kwStr(kwargs, "state", ""); state != "" {
+			if err := w.setWindowState(state); err != nil {
 				return nil, err
 			}
 		}
@@ -135,6 +156,37 @@ func Register(i *lang.Interp) *App {
 		return widget, app.applyCommon(widget, kwargs)
 	})
 
+	regContainer := func(name, kind string, extra ...string) {
+		reg(name, func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
+			if err := lang.CheckArity(name, args, 0); err != nil {
+				return nil, err
+			}
+			if err := checkKw(kwargs, widgetKw(extra...)...); err != nil {
+				return nil, err
+			}
+			cols := 2
+			if v, ok := kwargs["cols"]; ok {
+				n, err := numArg(v, "cols")
+				if err != nil {
+					return nil, err
+				}
+				cols = int(n)
+			}
+			x, y, w, h, err := app.geometry(kwargs)
+			if err != nil {
+				return nil, err
+			}
+			widget, err := app.createPanel(kind, cols, x, y, w, h)
+			if err != nil {
+				return nil, err
+			}
+			return widget, app.applyCommon(widget, kwargs)
+		})
+	}
+	regContainer("panel", "panel")
+	regContainer("scroll", "scroll")
+	regContainer("grid", "grid", "cols")
+
 	reg("checkbox", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
 		if err := lang.CheckArity("checkbox", args, 1); err != nil {
 			return nil, err
@@ -149,6 +201,89 @@ func Register(i *lang.Interp) *App {
 			return nil, err
 		}
 		widget, err := app.createCheckbox(text, checked, x, y, w, h)
+		if err != nil {
+			return nil, err
+		}
+		return widget, app.applyCommon(widget, kwargs)
+	})
+
+	reg("radio", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
+		if err := lang.CheckArity("radio", args, 1); err != nil {
+			return nil, err
+		}
+		if err := checkKw(kwargs, widgetKw("text", "checked")...); err != nil {
+			return nil, err
+		}
+		text := lang.ToString(lang.Named(args, kwargs, 0, "text", "选项"))
+		checked := kwBool(kwargs, "checked", false)
+		x, y, w, h, err := app.geometry(kwargs)
+		if err != nil {
+			return nil, err
+		}
+		widget, err := app.createRadio(text, checked, x, y, w, h)
+		if err != nil {
+			return nil, err
+		}
+		return widget, app.applyCommon(widget, kwargs)
+	})
+
+	reg("statusbar", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
+		if err := lang.CheckArity("statusbar", args, 1); err != nil {
+			return nil, err
+		}
+		if err := checkKw(kwargs, widgetKw("text")...); err != nil {
+			return nil, err
+		}
+		text := lang.ToString(lang.Named(args, kwargs, 0, "text", ""))
+		x, y, w, h, err := app.geometry(kwargs)
+		if err != nil {
+			return nil, err
+		}
+		widget, err := app.createStatusbar(text, x, y, w, h)
+		if err != nil {
+			return nil, err
+		}
+		return widget, app.applyCommon(widget, kwargs)
+	})
+
+	reg("date", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
+		if err := lang.CheckArity("date", args, 1); err != nil {
+			return nil, err
+		}
+		if err := checkKw(kwargs, widgetKw("value", "text")...); err != nil {
+			return nil, err
+		}
+		value := lang.ToString(lang.Named(args, kwargs, 0, "value", ""))
+		if value == "" {
+			value = kwStr(kwargs, "text", "")
+		}
+		x, y, w, h, err := app.geometry(kwargs)
+		if err != nil {
+			return nil, err
+		}
+		widget, err := app.createDate("date", value, x, y, w, h)
+		if err != nil {
+			return nil, err
+		}
+		return widget, app.applyCommon(widget, kwargs)
+	})
+
+	reg("time", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
+		if err := lang.CheckArity("time", args, 1); err != nil {
+			return nil, err
+		}
+		if err := checkKw(kwargs, widgetKw("value", "text")...); err != nil {
+			return nil, err
+		}
+		value := lang.ToString(lang.Named(args, kwargs, 0, "value", ""))
+		if value == "" {
+			value = kwStr(kwargs, "text", "")
+		}
+		x, y, w, h, err := app.geometry(kwargs)
+		if err != nil {
+			return nil, err
+		}
+		widget, err := app.createDate("time", value, x, y, w, h)
 		if err != nil {
 			return nil, err
 		}
@@ -564,21 +699,27 @@ func Register(i *lang.Interp) *App {
 		if done != nil && !callable(done) {
 			return nil, fmt.Errorf("async(): then 必须是函数")
 		}
+		task := lang.NewTask()
+		app.addTask(task)
 		go func() {
-			err := i.Protect(func() { i.CallValue(work) })
-			app.Post(func() {
-				if err != nil {
-					app.reportError(err)
-					return
+			var result lang.Value
+			err := i.ProtectCooperative(task, func() { result = i.CallValue(work) })
+			task.Finish(result, err)
+			if err != nil {
+				if !task.IsCancelled() {
+					app.Post(func() { app.reportError(err) })
 				}
-				if done != nil {
+				return
+			}
+			if done != nil && !task.IsCancelled() {
+				app.Post(func() {
 					if e := i.Protect(func() { i.CallValue(done) }); e != nil {
 						app.reportError(e)
 					}
-				}
-			})
+				})
+			}
 		}()
-		return nil, nil
+		return task, nil
 	})
 
 	reg("cancel_timer", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
@@ -608,7 +749,9 @@ func Register(i *lang.Interp) *App {
 		}
 		depth := i.Suspend()
 		defer i.Resume(depth)
-		if err := app.Run(); err != nil {
+		err := app.Run()
+		app.shutdownTasks()
+		if err != nil {
 			return nil, err
 		}
 		return nil, nil
@@ -717,8 +860,8 @@ func (a *App) geometry(kwargs map[string]lang.Value) (x, y, w, h *int32, err err
 	a.pendingParent = nil
 	if v, ok := kwargs["parent"]; ok {
 		p, ok := v.(*Widget)
-		if !ok || p.kind != "groupbox" {
-			return nil, nil, nil, nil, fmt.Errorf("parent 必须是 groupbox 控件")
+		if !ok || !isContainerKind(p.kind) {
+			return nil, nil, nil, nil, fmt.Errorf("parent 必须是 groupbox、panel、scroll 或 grid 控件")
 		}
 		a.pendingParent = p
 	}
@@ -774,6 +917,16 @@ func (a *App) applyCommon(w *Widget, kwargs map[string]lang.Value) error {
 	}
 	if v, ok := kwargs["visible"]; ok {
 		if err := w.SetProp("visible", v); err != nil {
+			return err
+		}
+	}
+	if v, ok := kwargs["anchor"]; ok {
+		if err := w.SetProp("anchor", v); err != nil {
+			return err
+		}
+	}
+	if v, ok := kwargs["tooltip"]; ok {
+		if err := w.SetProp("tooltip", v); err != nil {
 			return err
 		}
 	}

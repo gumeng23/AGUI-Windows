@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"agui/internal/lang"
@@ -17,6 +18,7 @@ const (
 	dialogClassName = "AguiInputDialog"
 	imageClassName  = "AguiImage"
 	canvasClassName = "AguiCanvas"
+	panelClassName  = "AguiPanel"
 )
 
 // App owns the Win32 state of one Agui GUI program.
@@ -51,9 +53,14 @@ type App struct {
 	asyncMu       sync.Mutex
 	asyncFns      map[uintptr]func()
 	nextAsync     uintptr
+	tasks         []*lang.Task
+	pendingUI     []func()
+	stopped       bool
 	accelTable    syscall.Handle
 	tableEdits    map[syscall.Handle]*Widget
 	pendingParent *Widget
+	tooltipHwnd   syscall.Handle
+	tooltipText   map[syscall.Handle][]uint16
 	startupShot   string
 	ran           bool
 	running       bool
@@ -77,19 +84,20 @@ var mainWndProcCallback = syscall.NewCallback(mainWndProc)
 func NewApp(i *lang.Interp) *App {
 	runtime.LockOSThread()
 	a := &App{
-		interp:     i,
-		widgets:    map[syscall.Handle]*Widget{},
-		byID:       map[int]*Widget{},
-		menuItems:  map[int]*MenuItem{},
-		brushes:    map[uint32]syscall.Handle{},
-		timers:     map[uintptr]*timerEntry{},
-		asyncFns:   map[uintptr]func(){},
-		tableEdits: map[syscall.Handle]*Widget{},
-		nextID:     1000,
-		nextTimer:  1,
-		margin:     20,
-		gap:        10,
-		fontSize:   10,
+		interp:      i,
+		widgets:     map[syscall.Handle]*Widget{},
+		byID:        map[int]*Widget{},
+		menuItems:   map[int]*MenuItem{},
+		brushes:     map[uint32]syscall.Handle{},
+		timers:      map[uintptr]*timerEntry{},
+		asyncFns:    map[uintptr]func(){},
+		tableEdits:  map[syscall.Handle]*Widget{},
+		tooltipText: map[syscall.Handle][]uint16{},
+		nextID:      1000,
+		nextTimer:   1,
+		margin:      20,
+		gap:         10,
+		fontSize:    10,
 	}
 	a.dpi = systemDPI()
 	a.scale = float64(a.dpi) / 96.0
@@ -123,6 +131,10 @@ func NewApp(i *lang.Interp) *App {
 	if err := registerWindowClass(canvasClassName, canvasProcCallback); err != nil {
 		panic(err)
 	}
+	if err := registerWindowClass(panelClassName, panelProcCallback); err != nil {
+		panic(err)
+	}
+	i.SetDispatcher(a.Post)
 	currentApp = a
 	return a
 }
@@ -227,7 +239,7 @@ func (a *App) createWindow(title string, width, height int, bg string, resizable
 	if hwnd == 0 {
 		return nil, fmt.Errorf("创建窗口失败")
 	}
-	w := &Widget{app: a, hwnd: hwnd, kind: "window", id: 0, parent: parent}
+	w := &Widget{app: a, hwnd: hwnd, kind: "window", id: 0, parent: parent, opacity: 1}
 	w.title = title
 	w.displayH = a.px(float64(height))
 	w.ctrlH = a.px(float64(height))
@@ -288,47 +300,54 @@ func (a *App) layoutWindow(win *Widget) {
 	if !ok || cr.right <= 0 || cr.bottom <= 0 {
 		return
 	}
-	cursor := a.margin
-	for _, w := range win.children {
-		x, y := w.x, w.y
-		if w.autoX {
-			x = a.margin
-		}
-		if w.autoY {
-			y = cursor
-		}
-		width := w.w
-		if w.autoW {
-			if w.fullWidth {
-				width = cr.right - x - a.margin
-			} else {
-				width = w.defW
-			}
-			if width < a.px(40) {
-				width = a.px(40)
-			}
-		}
-		ctrlH := w.ctrlH
-		if ctrlH == 0 {
-			ctrlH = w.h
-		}
-		moveWindow(w.hwnd, x, y, width, ctrlH, true)
-		w.x, w.y, w.w = x, y, width
-		cursor = y + w.displayH + w.gap
-		if w.kind == "groupbox" {
-			a.layoutGroup(w)
-		}
-	}
+	a.layoutContainer(win, cr.right, cr.bottom)
 }
 
-// layoutGroup arranges controls inside a groupbox using its own client area.
-func (a *App) layoutGroup(g *Widget) {
-	if g == nil || g.kind != "groupbox" || g.w <= 0 {
+func isContainerKind(kind string) bool {
+	return kind == "groupbox" || kind == "panel" || kind == "scroll" || kind == "grid"
+}
+
+func (a *App) containerMargin(kind string) int32 {
+	switch kind {
+	case "groupbox":
+		return a.px(12)
+	case "panel", "scroll":
+		return a.px(8)
+	case "grid":
+		return a.px(4)
+	}
+	return a.margin
+}
+
+func (a *App) containerStart(kind string) int32 {
+	if kind == "groupbox" {
+		return a.px(26)
+	}
+	return a.px(8)
+}
+
+// layoutContainer lays out one container recursively. Coordinates are relative
+// to the container's client area; hidden children take no space.
+func (a *App) layoutContainer(c *Widget, width, height int32) {
+	if c == nil || c.hwnd == 0 || width <= 0 || height <= 0 {
 		return
 	}
-	margin := a.px(12)
-	cursor := a.px(26)
-	for _, w := range g.children {
+	c.w, c.h = width, height
+	if c.kind == "grid" {
+		a.layoutGrid(c, width, height)
+		return
+	}
+	margin := a.containerMargin(c.kind)
+	cursor := a.containerStart(c.kind)
+	var statusbar *Widget
+	for _, w := range c.children {
+		if w == nil || w.hwnd == 0 || w.hidden {
+			continue
+		}
+		if w.kind == "statusbar" {
+			statusbar = w
+			continue
+		}
 		x, y := w.x, w.y
 		if w.autoX {
 			x = margin
@@ -336,24 +355,167 @@ func (a *App) layoutGroup(g *Widget) {
 		if w.autoY {
 			y = cursor
 		}
-		width := w.w
+		ww := w.w
 		if w.autoW {
 			if w.fullWidth {
-				width = g.w - 2*margin
+				ww = width - 2*margin
 			} else {
-				width = w.defW
+				ww = w.defW
 			}
-			if width < a.px(40) {
-				width = a.px(40)
+			if ww < a.px(40) {
+				ww = a.px(40)
 			}
 		}
-		ctrlH := w.ctrlH
-		if ctrlH == 0 {
-			ctrlH = w.h
+		hh := w.ctrlH
+		if hh == 0 {
+			hh = w.h
 		}
-		moveWindow(w.hwnd, x, y, width, ctrlH, true)
-		w.x, w.y, w.w = x, y, width
+		anchor := strings.ToLower(w.anchor)
+		hasLeft := strings.Contains(anchor, "left")
+		hasRight := strings.Contains(anchor, "right")
+		hasTop := strings.Contains(anchor, "top")
+		hasBottom := strings.Contains(anchor, "bottom")
+		if hasRight && !hasLeft {
+			x = width - margin - ww
+		}
+		if hasLeft && hasRight {
+			x = margin
+			ww = width - 2*margin
+		}
+		if hasBottom && !hasTop {
+			y = height - margin - hh
+		}
+		if hasTop && hasBottom {
+			y = margin
+			hh = height - 2*margin
+		}
+		screenY := y
+		if c.kind == "scroll" {
+			screenY -= c.scrollY
+		}
+		moveWindow(w.hwnd, x, screenY, ww, hh, true)
+		w.x, w.y, w.w = x, y, ww
+		if hh > 0 {
+			w.h = hh
+		}
 		cursor = y + w.displayH + w.gap
+		if isContainerKind(w.kind) {
+			a.layoutContainer(w, ww, hh)
+		}
+	}
+	if statusbar != nil {
+		ww := width - 2*margin
+		hh := statusbar.h
+		if hh <= 0 {
+			hh = a.px(28)
+		}
+		y := height - margin - hh
+		moveWindow(statusbar.hwnd, margin, y, ww, hh, true)
+		statusbar.x, statusbar.y, statusbar.w, statusbar.h = margin, y, ww, hh
+		statusbar.setStatusParts(statusbar.statusParts)
+	}
+	if c.kind == "scroll" {
+		c.scrollH = cursor + margin
+		a.applyScroll(c)
+	}
+}
+
+func (a *App) layoutGrid(c *Widget, width, height int32) {
+	margin := a.px(4)
+	gap := a.px(4)
+	cols := c.gridCols
+	if cols < 1 {
+		cols = 2
+	}
+	cellW := (width - 2*margin - int32(cols-1)*gap) / int32(cols)
+	if cellW < a.px(40) {
+		cellW = a.px(40)
+	}
+	x, y := margin, margin
+	rowH := int32(0)
+	col := 0
+	for _, w := range c.children {
+		if w == nil || w.hwnd == 0 || w.hidden {
+			continue
+		}
+		ww := w.w
+		if w.autoW || w.fullWidth {
+			ww = cellW
+		}
+		hh := w.ctrlH
+		if hh == 0 {
+			hh = w.h
+		}
+		moveWindow(w.hwnd, x, y, ww, hh, true)
+		w.x, w.y, w.w = x, y, ww
+		if hh > 0 {
+			w.h = hh
+		}
+		if isContainerKind(w.kind) {
+			a.layoutContainer(w, ww, hh)
+		}
+		if hh > rowH {
+			rowH = hh
+		}
+		col++
+		if col >= cols {
+			col = 0
+			x = margin
+			y += rowH + gap
+			rowH = 0
+		} else {
+			x += cellW + gap
+		}
+	}
+}
+
+func (a *App) applyScroll(w *Widget) {
+	max := w.scrollH - w.h
+	if max < 0 {
+		max = 0
+	}
+	if w.scrollY > max {
+		w.scrollY = max
+	}
+	if w.scrollY < 0 {
+		w.scrollY = 0
+	}
+	pSetScrollRange.Call(uintptr(w.hwnd), sbVert, 0, uintptr(max), 1)
+	pSetScrollPos.Call(uintptr(w.hwnd), sbVert, uintptr(w.scrollY), 1)
+}
+
+func (a *App) scrollPanel(w *Widget, code uintptr) {
+	if w == nil {
+		return
+	}
+	old := w.scrollY
+	line := a.px(24)
+	switch int(code & 0xffff) {
+	case sbLineUp:
+		w.scrollY -= line
+	case sbLineDown:
+		w.scrollY += line
+	case sbPageUp:
+		w.scrollY -= w.h - line
+	case sbPageDown:
+		w.scrollY += w.h - line
+	case sbThumbTrack:
+		w.scrollY = int32(int16(code >> 16))
+	case sbTop:
+		w.scrollY = 0
+	case sbBottom:
+		w.scrollY = w.scrollH
+	}
+	if w.scrollY != old {
+		a.layoutContainer(w, w.w, w.h)
+	}
+}
+
+// layoutGroup is kept for compatibility; layoutContainer handles all nested
+// containers, including group boxes.
+func (a *App) layoutGroup(g *Widget) {
+	if g != nil && g.kind == "groupbox" {
+		a.layoutContainer(g, g.w, g.h)
 	}
 }
 
@@ -392,6 +554,7 @@ func (a *App) Run() error {
 			return err
 		})
 	}
+	a.drainPendingUI()
 	a.ran = true
 	a.running = true
 	defer func() { a.running = false }()
@@ -522,6 +685,10 @@ func (a *App) Post(fn func()) {
 		return
 	}
 	a.asyncMu.Lock()
+	if a.stopped {
+		a.asyncMu.Unlock()
+		return
+	}
 	a.nextAsync++
 	id := a.nextAsync
 	a.asyncFns[id] = fn
@@ -531,6 +698,11 @@ func (a *App) Post(fn func()) {
 	}
 	a.asyncMu.Unlock()
 	if hwnd == 0 {
+		// Console-only scripts never start a message loop; run the callback
+		// immediately instead of queuing it forever.
+		a.asyncMu.Lock()
+		delete(a.asyncFns, id)
+		a.asyncMu.Unlock()
 		fn()
 		return
 	}
@@ -538,6 +710,41 @@ func (a *App) Post(fn func()) {
 		a.asyncMu.Lock()
 		delete(a.asyncFns, id)
 		a.asyncMu.Unlock()
+		fn()
+	}
+}
+
+func (a *App) addTask(t *lang.Task) {
+	a.asyncMu.Lock()
+	a.tasks = append(a.tasks, t)
+	a.asyncMu.Unlock()
+}
+
+// shutdownTasks cancels all background work and waits briefly for it to stop.
+func (a *App) shutdownTasks() {
+	a.asyncMu.Lock()
+	a.stopped = true
+	tasks := append([]*lang.Task(nil), a.tasks...)
+	a.asyncMu.Unlock()
+	for _, t := range tasks {
+		t.Cancel()
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for _, t := range tasks {
+		remain := time.Until(deadline)
+		if remain <= 0 {
+			break
+		}
+		t.Wait(remain)
+	}
+}
+
+func (a *App) drainPendingUI() {
+	a.asyncMu.Lock()
+	fns := a.pendingUI
+	a.pendingUI = nil
+	a.asyncMu.Unlock()
+	for _, fn := range fns {
 		fn()
 	}
 }
@@ -606,6 +813,11 @@ func mainWndProc(hwnd, msg, wparam, lparam uintptr) (ret uintptr) {
 				w.tableNotify(hdr.code, lparam)
 			case "tree":
 				w.treeNotify(hdr.code, lparam)
+			case "date", "time":
+				if hdr.code == dtnDateTimeChange {
+					w.syncDateFromControl()
+					w.emit("change")
+				}
 			}
 		}
 		return 0
@@ -722,6 +934,18 @@ func (w *Widget) command(code int) {
 		if code == bnClicked {
 			w.emit("click")
 			w.emit("change")
+		}
+	case "radio":
+		if code == bnClicked {
+			w.emit("click")
+			w.emit("change")
+		}
+	case "statusbar":
+		switch code {
+		case stnClicked:
+			w.emit("click")
+		case stnDblClk:
+			w.emit("dblclick")
 		}
 	case "label":
 		switch code {

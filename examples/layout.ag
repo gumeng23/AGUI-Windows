@@ -1,0 +1,33 @@
+# 布局引擎示例：panel / grid / scroll / anchor / 隐藏控件 / 嵌套 groupbox
+window("布局引擎", 820, 700, bg="#F8FAFC")
+
+label("下面是一个普通 panel，子控件用 parent= 指定容器", x=20, y=16)
+p = panel(x=20, y=52, w=360, h=230, bg="#FFFFFF")
+label("panel 内的标题", parent=p)
+e = edit("", parent=p)
+button("p 内按钮", parent=p)
+nested = groupbox("嵌套分组", parent=p)
+label("分组里的 label", parent=nested)
+button("分组里的按钮", parent=nested)
+
+label("锚点：右下角按钮", x=420, y=16)
+anchor_btn = button("右下锚点", anchor="right,bottom", bg="#2563EB", fg="#FFFFFF")
+
+label("隐藏控件不占位：下面 label 隐藏，按钮应上移", x=20, y=300)
+hidden_label = label("我被隐藏了", x=20, visible=false)
+after_hidden = button("隐藏后上移的按钮", x=20)
+
+label("grid：3 列 6 项", x=420, y=80)
+g = grid(cols=3, x=420, y=112, w=360, h=170)
+for i in range(6):
+    cell = button("格 " + str(i), parent=g)
+
+label("scroll：滚轮/滚动条", x=20, y=390)
+s = scroll(x=20, y=422, w=360, h=190, bg="#FFFFFF")
+for i in range(12):
+    button("滚动项 " + str(i), parent=s)
+
+label("嵌套 groupbox 在 panel 内已递归布局", x=420, y=300)
+status = label("拖拽文件到窗口试试", x=420, y=336)
+
+run()

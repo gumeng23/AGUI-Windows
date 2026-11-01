@@ -1,0 +1,20 @@
+// 需要本地或远程 WebSocket echo 服务：
+//   python scripts/ws_echo.py
+// 然后运行：agui run examples/websocket.ag
+url = "ws://127.0.0.1:8765"
+if len(args) > 0:
+    url = args[0]
+
+ws = ws_connect(url, timeout=5)
+print("已连接:", ws.connected, ws.url)
+
+on ws.message:
+    print("收到:", ws.message, "类型:", ws.type)
+    ws.close()
+
+on ws.close:
+    print("连接已关闭")
+
+ws.send("hello")
+t = async(lambda: sleep(3000))
+t.wait(5)

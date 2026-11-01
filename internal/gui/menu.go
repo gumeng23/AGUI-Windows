@@ -356,7 +356,11 @@ func (mi *MenuItem) setIcon(path string) error {
 		}
 		return nil
 	}
-	h, err := loadMenuBitmap(path)
+	resolved, err := mi.app.interp.AssetPath(path)
+	if err != nil {
+		return err
+	}
+	h, err := loadMenuBitmap(resolved)
 	if err != nil {
 		return err
 	}

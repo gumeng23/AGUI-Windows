@@ -1,0 +1,34 @@
+win = window("补充控件", 720, 620, center=true)
+
+status = statusbar("就绪\tDPI 自动\tAgui 0.5")
+
+label("账户")
+g = groupbox("账户", h=150)
+radio("标准", parent=g, checked=true)
+radio("紧凑", parent=g)
+
+label("日期")
+date("2026-11-01")
+label("时间")
+time("15:30:00")
+
+button("悬停查看提示", tooltip="这是一个原生 tooltip")
+b_top = button("置顶")
+b_alpha = button("半透明")
+b_max = button("最大化")
+b_flash = button("闪烁")
+
+on b_top.click:
+    win.topmost = not win.topmost
+
+on b_alpha.click:
+    win.opacity = 0.72
+
+on b_max.click:
+    win.state = "maximized"
+
+on b_flash.click:
+    win.flash()
+
+on win.close:
+    quit()

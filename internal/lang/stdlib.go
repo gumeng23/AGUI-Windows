@@ -148,6 +148,7 @@ func registerStdlib(i *Interp) {
 		}
 		return doHTTP(i, strings.ToUpper(method), args[1], body, kwargs)
 	})
+	registerHTTP(i)
 }
 
 func stdBool(kwargs map[string]Value, name string, def bool) bool {
@@ -178,6 +179,9 @@ func doHTTP(i *Interp, method string, urlVal Value, body Value, kwargs map[strin
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", strings.ToLower(method), err)
 	}
+	if ctx := i.TaskContext(); ctx != nil {
+		req = req.WithContext(ctx)
+	}
 	headers, err := headerMap(kwargs["headers"])
 	if err != nil {
 		return nil, err
@@ -189,14 +193,23 @@ func doHTTP(i *Interp, method string, urlVal Value, body Value, kwargs map[strin
 		req.Header.Set("Content-Type", "text/plain; charset=utf-8")
 	}
 	client := &http.Client{Timeout: time.Duration(timeout * float64(time.Second))}
-	resp, err := client.Do(req)
+	var resp *http.Response
+	var data []byte
+	err = i.Blocking(func() error {
+		var reqErr error
+		resp, reqErr = client.Do(req)
+		if reqErr != nil {
+			return reqErr
+		}
+		defer resp.Body.Close()
+		data, reqErr = io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+		return reqErr
+	})
 	if err != nil {
+		if ctx := i.TaskContext(); ctx != nil && ctx.Err() != nil {
+			return nil, fmt.Errorf("%s 已取消", strings.ToLower(method))
+		}
 		return nil, fmt.Errorf("%s %s: %v", method, rawURL, err)
-	}
-	defer resp.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
-	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %v", err)
 	}
 	out := NewMap()
 	out.Set("status", float64(resp.StatusCode))
