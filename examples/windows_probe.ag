@@ -1,0 +1,25 @@
+# 多窗口动态创建探针
+main = window("多窗口主窗口", w=560, h=360)
+label("主窗口控件", x=24, y=24)
+open = button("打开子窗口", x=24, y=64, w=180)
+
+func make_sub():
+    sub = window("动态子窗口", w=440, h=280, bg="#FFFFFF")
+    label("子窗口自己的控件", x=24, y=24)
+    b = button("子窗口按钮", x=24, y=64, w=160, bg="#2563EB", fg="#FFFFFF")
+    on b.click:
+        print("子窗口按钮点击")
+    print("sub created, title=", sub.title)
+
+on open.click:
+    make_sub()
+
+func snap():
+    screenshot("build/windows_sub.png")
+
+func trigger():
+    open.click()
+
+after(300, trigger)
+after(900, snap)
+after(1300, quit)

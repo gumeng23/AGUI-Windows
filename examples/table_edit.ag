@@ -1,0 +1,36 @@
+# table 排序与单元格编辑
+window("表格编辑", 720, 480)
+
+hint = label("单击列头排序；双击单元格编辑，Enter 提交，Esc 取消。", fg="#475569")
+t = table(["名称", "数量", "备注"], [
+    ["苹果", "12", "红色"],
+    ["香蕉", "3", "黄色"],
+    ["樱桃", "25", "深红"],
+], h=220, editable=true)
+status = label("就绪")
+
+func show_rows():
+    rows = t.rows
+    s = ""
+    for r in rows:
+        s = s + r[0] + " "
+    status.text = s
+
+on t.select:
+    status.text = "选中第 " + str(t.selected) + " 行"
+
+on t.dblclick:
+    status.text = "编辑单元格"
+
+b1 = button("按数量排序", fg="#ffffff", bg="#2563eb")
+on b1.click:
+    t.sort(1)
+    show_rows()
+
+b2 = button("按名称排序", fg="#ffffff", bg="#0f766e")
+on b2.click:
+    t.sort(0, true)
+    show_rows()
+
+show_rows()
+after(5000, quit)

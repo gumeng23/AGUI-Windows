@@ -1,0 +1,26 @@
+# lang_features.ag —— 切片、lambda、try/catch、import
+nums = [1, 2, 3, 4, 5]
+print("slice1=", nums[1:3])
+print("slice2=", nums[:2])
+print("slice3=", nums[3:])
+print("slice4=", nums[-2:])
+text = "abcdef"
+print("strslice=", text[1:4], text[:2], text[4:])
+
+double = lambda x: x * 2
+add = lambda x, y: x + y
+noarg = lambda: 42
+print("lambda=", double(5), add(2, 3), noarg())
+
+try:
+    print(nums[9])
+catch e:
+    print("caught:", e)
+
+try:
+    print(1 / 0)
+catch err:
+    print("caught2:", err)
+
+import "lib_math.ag"
+print("import square=", square(7), "cube=", cube(3), "name=", module_name)

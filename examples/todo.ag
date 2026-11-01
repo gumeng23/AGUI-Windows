@@ -1,0 +1,51 @@
+# todo.ag —— 待办清单：列表、事件、文件读写
+win = window("待办清单", w=640, h=560)
+
+label("待办事项", fg="#1D4ED8", h=32)
+
+entry = edit("", x=20, y=60, w=430, h=32)
+add = button("添加", x=462, y=60, w=120, h=32)
+
+tasks = listbox([], h=260)
+delete_btn = button("删除选中", w=150)
+count = label("共 0 项", fg="#666666")
+
+func refresh():
+    count.text = "共 " + str(tasks.count) + " 项"
+
+func save():
+    write_file("todo.txt", tasks.items.join("\n"))
+
+func load():
+    if file_exists("todo.txt"):
+        text = read_file("todo.txt")
+        for line in text.split("\n"):
+            if trim(line) != "":
+                tasks.add_item(line)
+    refresh()
+
+on add.click:
+    text = trim(entry.text)
+    if text == "":
+        msgbox("请输入内容", kind="warn")
+    else:
+        tasks.add_item(text)
+        entry.text = ""
+        entry.focus()
+        refresh()
+        save()
+
+on delete_btn.click:
+    idx = tasks.selected
+    if idx < 0:
+        msgbox("请先在列表里选中一项", kind="warn")
+    else:
+        tasks.remove_item(idx)
+        refresh()
+        save()
+
+on win.close:
+    save()
+
+load()
+refresh()

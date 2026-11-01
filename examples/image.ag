@@ -1,0 +1,14 @@
+# 图片控件与窗口图标演示
+window("图片与图标", 640, 460, icon="assets/agui.png", bg="#F8FAFC")
+
+label("图片控件支持 png/jpg，自动等比缩放：", x=24, y=18)
+img = image("assets/agui.png", x=24, y=52, w=420, h=260)
+label("窗口左上角也使用了同一张图片作为图标。", x=24, y=326, fg="#475569")
+no_stretch = button("切换为不拉伸", x=24, y=362, w=190, h=40, bg="#2563EB", fg="#FFFFFF")
+restore = button("恢复拉伸", x=230, y=362, w=170, h=40, bg="#E2E8F0", fg="#0F172A")
+
+on no_stretch.click:
+    img.fit = false
+
+on restore.click:
+    img.fit = true

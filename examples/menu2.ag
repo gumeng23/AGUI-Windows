@@ -1,0 +1,35 @@
+# menu2.ag —— 子菜单、勾选项、快捷键文本
+win = window("完整菜单示例", w=640, h=420)
+
+file = menu("文件(&F)")
+new = file.item("新建(&N)", accel="Ctrl+N")
+open = file.item("打开(&O)...", accel="Ctrl+O")
+file.separator()
+recent = file.submenu("最近打开")
+recent.item("README.md")
+recent.item("examples/hello.ag")
+file.separator()
+file.item("退出(&X)", quit, accel="Alt+F4")
+
+view = menu("视图(&V)")
+status = view.item("显示状态栏", checkable=true, checked=true, accel="Ctrl+/")
+theme = view.submenu("主题")
+light = theme.item("浅色", checkable=true, checked=true)
+dark = theme.item("深色", checkable=true)
+
+label("菜单支持子菜单、勾选菜单项和快捷键文本。")
+status_label = label("状态栏：显示")
+
+on status.click:
+    if status.checked:
+        status_label.text = "状态栏：显示"
+    else:
+        status_label.text = "状态栏：隐藏"
+
+on dark.click:
+    light.checked = false
+on light.click:
+    dark.checked = false
+
+on win.close:
+    print("菜单示例关闭")

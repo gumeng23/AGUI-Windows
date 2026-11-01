@@ -1,0 +1,47 @@
+# 表格控件演示
+window("表格控件", 780, 560, bg="#F8FAFC")
+
+label("基础表格控件：列头、数据行、选中事件、双击事件。", x=24, y=18)
+t = table(
+    ["姓名", "部门", "岗位", "状态"],
+    [
+        ["张三", "研发部", "工程师", "在职"],
+        ["李四", "产品部", "产品经理", "在职"],
+        ["王五", "设计部", "设计师", "休假"],
+        ["赵六", "市场部", "市场专员", "在职"],
+        ["钱七", "研发部", "架构师", "离职"]
+    ],
+    x=24, y=52, w=720, h=300
+)
+status = label("请选择一行；双击也会触发事件。", x=24, y=370, fg="#475569")
+count = label("共 5 行", x=24, y=404, fg="#475569")
+
+add = button("添加一行", x=24, y=446, w=150, h=40, bg="#2563EB", fg="#FFFFFF")
+del = button("删除选中", x=188, y=446, w=150, h=40, bg="#DC2626", fg="#FFFFFF")
+clr = button("清空表格", x=352, y=446, w=150, h=40, bg="#E2E8F0", fg="#0F172A")
+
+on t.select:
+    sel = t.selected
+    if sel >= 0:
+        status.text = "选中第 " + str(sel + 1) + " 行：" + t.get_cell(sel, 0)
+    else:
+        status.text = "当前没有选中行"
+
+on t.dblclick:
+    sel = t.selected
+    if sel >= 0:
+        status.text = "双击了：" + t.get_cell(sel, 0) + " / " + t.get_cell(sel, 2)
+
+on add.click:
+    t.add_row(["新同学", "研发部", "实习生", "在职"])
+    count.text = "共 " + str(t.row_count) + " 行"
+
+on del.click:
+    sel = t.selected
+    if sel >= 0:
+        t.remove_row(sel)
+        count.text = "共 " + str(t.row_count) + " 行"
+
+on clr.click:
+    t.clear()
+    count.text = "共 0 行"

@@ -1,0 +1,27 @@
+# async_probe.ag
+window("async probe", 520, 300)
+status = label("等待后台任务...", x=24, y=24)
+
+func work():
+    sleep(300)
+    print("background work done")
+
+func done():
+    status.text = "后台任务完成，回调已回到 UI 线程"
+    print("callback on ui thread")
+
+async(work, done)
+
+print("limit before=", get_recursion_limit())
+set_recursion_limit(20)
+print("limit after=", get_recursion_limit())
+
+func dive(n):
+    return dive(n + 1)
+
+try:
+    dive(0)
+catch e:
+    print("caught recursion:", e)
+
+after(1000, quit)

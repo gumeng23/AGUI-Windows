@@ -1,0 +1,35 @@
+class Counter:
+  func init(start):
+    self.n = start
+  func add(k):
+    self.n += k
+    return self.n
+  func get():
+    return self.n
+
+c = Counter(10)
+print(c.add(5), c.get())
+print(type(c), c)
+
+func boom(x):
+  try:
+    if x == 0:
+      raise "bad zero"
+    return 10 / x
+  catch e:
+    print("caught", e)
+    return -1
+  finally:
+    print("finally", x)
+
+print("boom0=", boom(0))
+print("boom2=", boom(2))
+
+f = lambda x:
+  y = x * 2
+  y + 1
+print("lambda=", f(5))
+
+print([0, 1, 2, 3, 4][::-1])
+print([0, 1, 2, 3, 4][1:4:2])
+print("abcdef"[::2])

@@ -1,0 +1,12 @@
+.vscode/**
+.vscode-test/**
+src/**
+out/**/*.map
+**/*.ts
+**/*.map
+tsconfig.json
+package-lock.json
+node_modules/**
+.gitignore
+.make-icon.py
+*.vsix

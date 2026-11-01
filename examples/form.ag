@@ -1,0 +1,26 @@
+# form.ag —— 输入框、复选框、下拉框、列表
+win = window("注册表单", w=600, h=600)
+
+label("姓名")
+name = edit("", w=400)
+
+agree = checkbox("我同意条款")
+plan = combo(["免费版", "专业版", "企业版"], w=240)
+plan.selected = 1
+
+label("进度")
+bar = progress(30)
+volume = slider(30, max=100)
+on volume.change:
+    bar.value = volume.value
+
+log = listbox(["程序已启动"], h=130)
+
+submit = button("提交", w=140)
+on submit.click:
+    msg = "姓名：" + name.text + "\n同意：" + str(agree.checked) + "\n套餐下标：" + str(plan.selected)
+    msgbox(msg, title="提交内容")
+    log.add_item("提交了一次")
+
+on win.close:
+    print("表单关闭")

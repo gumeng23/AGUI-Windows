@@ -1,0 +1,12 @@
+window("Canvas 画布", 520, 460)
+head = label("自绘画布：点击任意位置", font=font("Microsoft YaHei UI", 12, bold=true))
+c = canvas(w=460, h=260, bg="#ffffff")
+c.rect(18, 18, 120, 70, color="#2563eb", fill=true)
+c.rect(160, 18, 120, 70, color="#0f766e", fill=false, width=3)
+c.circle(360, 55, 32, color="#dc2626", fill=true)
+c.line(18, 130, 440, 130, color="#f59e0b", width=4)
+c.text(18, 150, "Hello, Agui Canvas!", color="#111827", size=20)
+c.text(18, 185, "line / rect / circle / text", color="#6b7280", size=12)
+status = label("鼠标位置：-")
+on c.click:
+    status.text = "click at " + str(c.mouse_x) + ", " + str(c.mouse_y)

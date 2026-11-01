@@ -1,0 +1,53 @@
+{
+  "Agui 窗口骨架": {
+    "prefix": ["agui", "win"],
+    "body": [
+      "win = window(\"${1:标题}\", w=${2:560}, h=${3:360})",
+      "",
+      "label(\"${4:欢迎使用 Agui}\")",
+      "btn = button(\"${5:点我}\", w=150)",
+      "",
+      "on btn.click:",
+      "    $0msgbox(\"你好！\")"
+    ],
+    "description": "创建一个窗口、标签、按钮和点击事件"
+  },
+  "事件处理器": {
+    "prefix": ["on", "监听"],
+    "body": ["on ${1:控件}.${2:click}:", "    $0"],
+    "description": "注册控件事件"
+  },
+  "函数": {
+    "prefix": ["func", "函数"],
+    "body": ["func ${1:名字}(${2:参数}):", "    $0"],
+    "description": "定义函数"
+  },
+  "条件分支": {
+    "prefix": ["if", "如果"],
+    "body": ["if ${1:条件}:", "    $2", "else:", "    $0"],
+    "description": "if / else 分支"
+  },
+  "遍历": {
+    "prefix": ["for", "对于"],
+    "body": ["for ${1:item} in ${2:列表}:", "    $0"],
+    "description": "for ... in 循环"
+  },
+  "异常捕获": {
+    "prefix": ["try", "尝试"],
+    "body": ["try:", "    $1", "catch ${2:err}:", "    $0"],
+    "description": "try / catch"
+  },
+  "菜单": {
+    "prefix": ["menu", "菜单"],
+    "body": [
+      "${1:file} = menu(\"${2:文件(&F)}\")",
+      "${3:open} = ${1:file}.item(\"${4:打开(&O)...}\", accel=\"Ctrl+O\")",
+      "${1:file}.separator()",
+      "${1:file}.item(\"退出(&X)\", quit)",
+      "",
+      "on ${3:open}.click:",
+      "    $0"
+    ],
+    "description": "创建菜单和菜单项"
+  }
+}

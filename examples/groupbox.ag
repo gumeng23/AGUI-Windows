@@ -1,0 +1,21 @@
+window("分组布局", 640, 520)
+head = label("groupbox 容器内的控件使用相对布局", fg="#475569", font=font("Microsoft YaHei UI", 11, bold=true))
+
+acct = groupbox("账户", h=230)
+label("用户名", parent=acct)
+name = edit("", parent=acct)
+label("密码", parent=acct)
+pwd = edit("", parent=acct, password=true, w=240)
+hint = label("密码至少 8 位", parent=acct, fg="#64748b")
+
+opts = groupbox("选项", h=120)
+c1 = checkbox("启用通知", checked=true, parent=opts)
+c2 = checkbox("自动保存", parent=opts)
+
+btn = button("提交", fg="#ffffff", bg="#2563eb")
+status = label("等待提交")
+on btn.click:
+    status.text = "已提交：" + name.text
+    msgbox("提示", "用户 " + name.text + " 已保存")
+
+after(3000, quit)

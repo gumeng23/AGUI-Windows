@@ -1,0 +1,12 @@
+window("async probe", 520, 300)
+status = label("等待后台任务...", x=24, y=24)
+
+func work():
+    print("work start")
+
+func done():
+    print("done callback")
+    status.text = "完成"
+
+async(work, done)
+after(1200, quit)

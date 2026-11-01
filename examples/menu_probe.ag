@@ -1,0 +1,14 @@
+window("menu probe", 500, 300)
+m = menu("视图")
+status = m.item("状态栏", checkable=true, checked=true)
+open_item = m.item("打开", accel="Ctrl+O")
+sub = m.submenu("最近打开")
+recent = sub.item("a.ag")
+print("checked start=", status.checked, "checkable=", status.checkable)
+status.checked = false
+print("checked after=", status.checked)
+print("accel=", open_item.accel)
+print("menu title=", m.title)
+m.title = "视图2"
+print("menu title after=", m.title)
+after(700, quit)

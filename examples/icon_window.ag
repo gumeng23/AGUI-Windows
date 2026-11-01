@@ -1,0 +1,11 @@
+# 窗口图标与截图验证：打包后运行会自动截图并退出。
+window("图标测试", w=480, h=300, icon="assets/app.ico")
+label("标题栏左上角应显示蓝色 Agui 图标", x=24, y=24)
+label("若打包时还指定了 --icon，任务栏/exe 图标也会使用同一图标", x=24, y=56, fg="#475569")
+
+func shot():
+    screenshot("build/icon_window.png")
+    quit()
+
+after(900, shot)
+run()

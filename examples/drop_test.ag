@@ -1,0 +1,8 @@
+win = window("拖拽测试", 480, 320)
+status = label("尚未收到文件")
+on win.drop:
+    status.text = "收到 " + str(len(win.dropped)) + " 个文件"
+    print("dropped", win.dropped)
+win.simulate_drop(["C:/tmp/a.txt", "C:/tmp/图片.png"])
+print("count", len(win.dropped))
+after(600, quit)

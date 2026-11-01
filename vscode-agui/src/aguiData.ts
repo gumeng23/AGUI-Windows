@@ -1,0 +1,350 @@
+/**
+ * Agui 语言与 GUI API 的静态描述数据，用于补全与悬停提示。
+ * 数据来源：docs/language.md、README.md、internal/gui/register.go。
+ */
+
+export type ApiKind = 'widget' | 'builtin' | 'gui' | 'event' | 'property' | 'method' | 'keyword';
+
+export interface ApiEntry {
+  name: string;
+  kind: ApiKind;
+  signature?: string;
+  doc: string;
+  /** 补全时插入的 snippet 文本（可选） */
+  snippet?: string;
+}
+
+export const WIDGETS: ApiEntry[] = [
+  {
+    name: 'window',
+    kind: 'widget',
+    signature: 'window(title, w=900, h=640)',
+    doc: '创建一个顶层窗口。可选命名参数：`bg`、`resizable`、`icon`、`parent`。',
+    snippet: 'window("${1:标题}", w=${2:560}, h=${3:360})',
+  },
+  {
+    name: 'menu',
+    kind: 'widget',
+    signature: 'menu(title)',
+    doc: '创建菜单栏中的一级菜单，用 `menu.item()` / `menu.submenu()` 添加条目。',
+    snippet: 'menu("${1:文件(&F)}")',
+  },
+  {
+    name: 'label',
+    kind: 'widget',
+    signature: 'label(text="")',
+    doc: '静态文字标签。支持 `fg`、`bg`、`font`、`x`、`y`、`w`、`h`。',
+    snippet: 'label("${1:文字}")',
+  },
+  {
+    name: 'button',
+    kind: 'widget',
+    signature: 'button(text="按钮")',
+    doc: '按钮。`fg` / `bg` 会启用自绘配色，默认宽度 150。',
+    snippet: 'button("${1:按钮}", w=${2:150})',
+  },
+  {
+    name: 'checkbox',
+    kind: 'widget',
+    signature: 'checkbox(text, checked=false)',
+    doc: '复选框。事件：`click`、`change`。',
+    snippet: 'checkbox("${1:选项}", checked=${2:false})',
+  },
+  {
+    name: 'edit',
+    kind: 'widget',
+    signature: 'edit(text="", multiline=false)',
+    doc: '单行或多行输入框，支持 `readonly`、`password`。事件：`change`。',
+    snippet: 'edit("${1:文本}", w=${2:260})',
+  },
+  {
+    name: 'richedit',
+    kind: 'widget',
+    signature: 'richedit(text="", readonly=false)',
+    doc: '富文本编辑框，提供 `append()`、`format()`。',
+    snippet: 'richedit("${1:文本}")',
+  },
+  {
+    name: 'listbox',
+    kind: 'widget',
+    signature: 'listbox(items=[])',
+    doc: '列表框。属性：`items`、`selected`、`count`。事件：`select`、`dblclick`。',
+    snippet: 'listbox([${1:"条目"}])',
+  },
+  {
+    name: 'combo',
+    kind: 'widget',
+    signature: 'combo(items=[])',
+    doc: '下拉框。属性：`items`、`selected`。事件：`select`、`change`、`dblclick`。',
+    snippet: 'combo([${1:"条目"}])',
+  },
+  {
+    name: 'progress',
+    kind: 'widget',
+    signature: 'progress(value=0, max=100)',
+    doc: '进度条。属性：`value`、`min`、`max`。',
+    snippet: 'progress(${1:0}, max=${2:100})',
+  },
+  {
+    name: 'slider',
+    kind: 'widget',
+    signature: 'slider(value=0, min=0, max=100)',
+    doc: '滑块。属性：`value`、`min`、`max`。事件：`change`。',
+    snippet: 'slider(${1:0}, min=${2:0}, max=${3:100})',
+  },
+  {
+    name: 'image',
+    kind: 'widget',
+    signature: 'image(src, fit=true)',
+    doc: '显示 png / jpg 图片，`fit=true` 保持比例缩放。',
+    snippet: 'image("${1:assets/app.png}", fit=${2:true})',
+  },
+  {
+    name: 'table',
+    kind: 'widget',
+    signature: 'table(headers, rows)',
+    doc: '表格（ListView）。方法：`add_row()`、`set_cell()`、`get_cell()`、`select()`。事件：`select`、`click`、`dblclick`。',
+    snippet: 'table([${1:"列名"}], [${2:["单元格"]}])',
+  },
+  {
+    name: 'font',
+    kind: 'widget',
+    signature: 'font(family, size, bold=false, italic=false)',
+    doc: '创建可复用的字体对象，传给控件的 `font=` 参数。',
+    snippet: 'font("${1:Microsoft YaHei UI}", ${2:14}, bold=${3:false})',
+  },
+];
+
+export const GUI_FUNCTIONS: ApiEntry[] = [
+  {
+    name: 'msgbox',
+    kind: 'gui',
+    signature: 'msgbox(text, title="提示", kind="info")',
+    doc: '弹出消息框。`kind` 可为 `info`、`warn`、`error`、`question`。',
+    snippet: 'msgbox("${1:你好}")',
+  },
+  {
+    name: 'confirm',
+    kind: 'gui',
+    signature: 'confirm(text, title="确认")',
+    doc: '确认对话框，返回 `true` / `false`。',
+    snippet: 'confirm("${1:确定继续吗？}")',
+  },
+  {
+    name: 'input',
+    kind: 'gui',
+    signature: 'input(text, title="输入", default="")',
+    doc: '文本输入对话框，返回用户输入的字符串。',
+    snippet: 'input("${1:请输入}", default="${2:}")',
+  },
+  {
+    name: 'open_file',
+    kind: 'gui',
+    signature: 'open_file(filter="", title="打开文件")',
+    doc: '系统“打开文件”对话框，取消时返回空字符串。',
+  },
+  {
+    name: 'save_file',
+    kind: 'gui',
+    signature: 'save_file(filter="", title="保存文件")',
+    doc: '系统“保存文件”对话框，取消时返回空字符串。',
+  },
+  {
+    name: 'after',
+    kind: 'gui',
+    signature: 'after(ms, fn)',
+    doc: '在 `ms` 毫秒后执行一次 `fn`，返回定时器 id。',
+  },
+  {
+    name: 'every',
+    kind: 'gui',
+    signature: 'every(ms, fn)',
+    doc: '每隔 `ms` 毫秒执行一次 `fn`，返回定时器 id。',
+  },
+  {
+    name: 'async',
+    kind: 'gui',
+    signature: 'async(work, then=null)',
+    doc: '在后台线程执行 `work`，完成后回到 UI 线程调用 `then`。',
+  },
+  {
+    name: 'cancel_timer',
+    kind: 'gui',
+    signature: 'cancel_timer(id)',
+    doc: '取消由 `after()` / `every()` 创建的定时器。',
+  },
+  { name: 'run', kind: 'gui', signature: 'run()', doc: '进入窗口消息循环（脚本末尾通常会自动调用）。' },
+  { name: 'quit', kind: 'gui', signature: 'quit()', doc: '立即结束消息循环（不触发 `close` 事件）。' },
+  { name: 'screenshot', kind: 'gui', signature: 'screenshot(path)', doc: '把当前窗口截图保存为 png。' },
+  { name: 'set_clipboard', kind: 'gui', signature: 'set_clipboard(text)', doc: '写入系统剪贴板。' },
+  { name: 'get_clipboard', kind: 'gui', signature: 'get_clipboard()', doc: '读取系统剪贴板文本。' },
+  { name: 'screen_width', kind: 'gui', signature: 'screen_width()', doc: '屏幕逻辑宽度（像素）。' },
+  { name: 'screen_height', kind: 'gui', signature: 'screen_height()', doc: '屏幕逻辑高度（像素）。' },
+  { name: 'dpi', kind: 'gui', signature: 'dpi()', doc: '当前 DPI 缩放比例。' },
+];
+
+export const BUILTINS: ApiEntry[] = [
+  { name: 'print', kind: 'builtin', signature: 'print(...)', doc: '向标准输出打印参数（空格分隔）。' },
+  { name: 'warn', kind: 'builtin', signature: 'warn(...)', doc: '向标准错误打印参数。' },
+  { name: 'format', kind: 'builtin', signature: 'format(模板, ...)', doc: '格式化字符串：`{}` 顺序占位，`{name}` 关键字占位。' },
+  { name: 'str', kind: 'builtin', signature: 'str(v)', doc: '转换为字符串。' },
+  { name: 'num', kind: 'builtin', signature: 'num(v)', doc: '转换为数字。' },
+  { name: 'int', kind: 'builtin', signature: 'int(v)', doc: '向零截断为整数（数字仍是浮点类型）。' },
+  { name: 'bool', kind: 'builtin', signature: 'bool(v)', doc: '转换为布尔值。' },
+  { name: 'type', kind: 'builtin', signature: 'type(v)', doc: '返回类型名：`null` / `bool` / `number` / `string` / `list` / `map` / `function` / `widget` / `font`。' },
+  { name: 'len', kind: 'builtin', signature: 'len(v)', doc: '列表、字典或字符串的长度。' },
+  { name: 'range', kind: 'builtin', signature: 'range(stop) / range(start, stop, step=1)', doc: '生成数字序列，常用于 `for`。' },
+  { name: 'list', kind: 'builtin', signature: 'list(v=[])', doc: '创建或复制列表。' },
+  { name: 'dict', kind: 'builtin', signature: 'dict(kwargs...)', doc: '创建字典。' },
+  { name: 'append', kind: 'builtin', signature: 'append(list, v)', doc: '向列表追加元素。' },
+  { name: 'pop', kind: 'builtin', signature: 'pop(list, index=-1)', doc: '弹出并返回元素。' },
+  { name: 'insert', kind: 'builtin', signature: 'insert(list, index, v)', doc: '在指定位置插入元素。' },
+  { name: 'remove', kind: 'builtin', signature: 'remove(list, index)', doc: '删除指定下标的元素。' },
+  { name: 'keys', kind: 'builtin', signature: 'keys(map)', doc: '返回字典的键列表。' },
+  { name: 'values', kind: 'builtin', signature: 'values(map)', doc: '返回字典的值列表。' },
+  { name: 'items', kind: 'builtin', signature: 'items(map)', doc: '返回 `[键, 值]` 列表。' },
+  { name: 'has', kind: 'builtin', signature: 'has(map, key)', doc: '字典是否包含某个键。' },
+  { name: 'get', kind: 'builtin', signature: 'get(map, key, default=null)', doc: '读取字典值并提供默认值。' },
+  { name: 'set', kind: 'builtin', signature: 'set(map, key, value)', doc: '写入字典。' },
+  { name: 'sort', kind: 'builtin', signature: 'sort(list, reverse=false)', doc: '原地排序列表。' },
+  { name: 'reverse', kind: 'builtin', signature: 'reverse(list)', doc: '原地反转列表。' },
+  { name: 'join', kind: 'builtin', signature: 'join(list, sep="")', doc: '用分隔符连接列表元素。' },
+  { name: 'split', kind: 'builtin', signature: 'split(s, sep=" ")', doc: '按分隔符拆分字符串。' },
+  { name: 'upper', kind: 'builtin', signature: 'upper(s)', doc: '转大写。' },
+  { name: 'lower', kind: 'builtin', signature: 'lower(s)', doc: '转小写。' },
+  { name: 'trim', kind: 'builtin', signature: 'trim(s)', doc: '去掉首尾空白。' },
+  { name: 'replace', kind: 'builtin', signature: 'replace(s, old, new)', doc: '替换子串。' },
+  { name: 'contains', kind: 'builtin', signature: 'contains(s, sub)', doc: '是否包含子串（也适用于列表 / 字典）。' },
+  { name: 'startswith', kind: 'builtin', signature: 'startswith(s, prefix)', doc: '是否以指定前缀开头。' },
+  { name: 'endswith', kind: 'builtin', signature: 'endswith(s, suffix)', doc: '是否以指定后缀结尾。' },
+  { name: 'substr', kind: 'builtin', signature: 'substr(s, start, end=null)', doc: '截取子串。' },
+  { name: 'find', kind: 'builtin', signature: 'find(s, sub)', doc: '查找子串，返回下标或 `-1`。' },
+  { name: 'abs', kind: 'builtin', signature: 'abs(n)', doc: '绝对值。' },
+  { name: 'round', kind: 'builtin', signature: 'round(n)', doc: '四舍五入。' },
+  { name: 'floor', kind: 'builtin', signature: 'floor(n)', doc: '向下取整。' },
+  { name: 'ceil', kind: 'builtin', signature: 'ceil(n)', doc: '向上取整。' },
+  { name: 'sqrt', kind: 'builtin', signature: 'sqrt(n)', doc: '平方根。' },
+  { name: 'pow', kind: 'builtin', signature: 'pow(base, exp)', doc: '幂运算。' },
+  { name: 'min', kind: 'builtin', signature: 'min(...)', doc: '最小值。' },
+  { name: 'max', kind: 'builtin', signature: 'max(...)', doc: '最大值。' },
+  { name: 'sum', kind: 'builtin', signature: 'sum(list)', doc: '求和。' },
+  { name: 'random', kind: 'builtin', signature: 'random()', doc: '返回 `[0, 1)` 的随机数。' },
+  { name: 'randint', kind: 'builtin', signature: 'randint(min, max)', doc: '返回区间内的随机整数。' },
+  { name: 'now', kind: 'builtin', signature: 'now()', doc: '当前时间字符串。' },
+  { name: 'timestamp', kind: 'builtin', signature: 'timestamp()', doc: '当前 Unix 时间戳（秒）。' },
+  { name: 'sleep', kind: 'builtin', signature: 'sleep(ms)', doc: '阻塞等待若干毫秒。' },
+  { name: 'read_file', kind: 'builtin', signature: 'read_file(path)', doc: '读取文本文件。' },
+  { name: 'write_file', kind: 'builtin', signature: 'write_file(path, text)', doc: '写入文本文件（覆盖）。' },
+  { name: 'append_file', kind: 'builtin', signature: 'append_file(path, text)', doc: '追加到文本文件。' },
+  { name: 'file_exists', kind: 'builtin', signature: 'file_exists(path)', doc: '文件或目录是否存在。' },
+  { name: 'delete_file', kind: 'builtin', signature: 'delete_file(path)', doc: '删除文件。' },
+  { name: 'list_dir', kind: 'builtin', signature: 'list_dir(path=".")', doc: '列出目录内容。' },
+  { name: 'mkdir', kind: 'builtin', signature: 'mkdir(path)', doc: '创建目录。' },
+  { name: 'basename', kind: 'builtin', signature: 'basename(path)', doc: '取文件名部分。' },
+  { name: 'dirname', kind: 'builtin', signature: 'dirname(path)', doc: '取目录部分。' },
+  { name: 'join_path', kind: 'builtin', signature: 'join_path(parts...)', doc: '拼接路径。' },
+  { name: 'abs_path', kind: 'builtin', signature: 'abs_path(path)', doc: '转换为绝对路径。' },
+  { name: 'cwd', kind: 'builtin', signature: 'cwd()', doc: '当前工作目录。' },
+];
+
+export interface EventInfo {
+  name: string;
+  controls: string;
+  doc: string;
+}
+
+export const EVENTS: EventInfo[] = [
+  { name: 'click', controls: 'button, label, checkbox, richedit, image, table, menuitem', doc: '点击事件。' },
+  { name: 'dblclick', controls: 'label, image, listbox, combo, table', doc: '双击事件。' },
+  { name: 'change', controls: 'checkbox, edit, richedit, combo, slider', doc: '内容或状态改变事件。' },
+  { name: 'select', controls: 'listbox, combo, table', doc: '选中项改变事件，`control.selected` 是选中下标。' },
+  { name: 'close', controls: 'window', doc: '窗口关闭前触发。' },
+  { name: 'resize', controls: 'window', doc: '窗口尺寸改变后触发。' },
+];
+
+export const PROPERTIES: ApiEntry[] = [
+  { name: 'text', kind: 'property', doc: '文字内容（窗口为标题）。' },
+  { name: 'checked', kind: 'property', doc: '复选框 / 可勾选菜单项是否勾选。' },
+  { name: 'items', kind: 'property', doc: '列表、下拉框的条目列表。' },
+  { name: 'selected', kind: 'property', doc: '选中下标，`-1` 表示未选中。' },
+  { name: 'count', kind: 'property', doc: '列表、下拉框的条目数量。' },
+  { name: 'value', kind: 'property', doc: '进度条 / 滑块当前值。' },
+  { name: 'min', kind: 'property', doc: '最小值。' },
+  { name: 'max', kind: 'property', doc: '最大值。' },
+  { name: 'readonly', kind: 'property', doc: '只读模式。' },
+  { name: 'password', kind: 'property', doc: '密码输入模式。' },
+  { name: 'src', kind: 'property', doc: '图片路径。' },
+  { name: 'fit', kind: 'property', doc: '图片是否保持比例缩放。' },
+  { name: 'rows', kind: 'property', doc: '表格行数据。' },
+  { name: 'headers', kind: 'property', doc: '表格表头。' },
+  { name: 'row_count', kind: 'property', doc: '表格行数。' },
+  { name: 'column_count', kind: 'property', doc: '表格列数。' },
+  { name: 'enabled', kind: 'property', doc: '控件是否启用。' },
+  { name: 'visible', kind: 'property', doc: '控件是否可见。' },
+  { name: 'x', kind: 'property', doc: '左边距（逻辑像素）。' },
+  { name: 'y', kind: 'property', doc: '上边距（逻辑像素）。' },
+  { name: 'w', kind: 'property', doc: '宽度。' },
+  { name: 'h', kind: 'property', doc: '高度。' },
+  { name: 'fg', kind: 'property', doc: '文字颜色，如 `#1D4ED8`。' },
+  { name: 'bg', kind: 'property', doc: '背景颜色。' },
+  { name: 'font', kind: 'property', doc: '字体对象。' },
+];
+
+export const METHODS: ApiEntry[] = [
+  { name: 'focus', kind: 'method', doc: '让控件获得焦点。' },
+  { name: 'click', kind: 'method', doc: '以程序方式点击（同步触发 click 事件）。' },
+  { name: 'clear', kind: 'method', doc: '清空输入框 / 列表。' },
+  { name: 'append', kind: 'method', doc: '追加文本（输入框 / 富文本）。' },
+  { name: 'add_item', kind: 'method', doc: '向列表添加条目。' },
+  { name: 'remove_item', kind: 'method', doc: '按下标移除列表条目。' },
+  { name: 'select', kind: 'method', doc: '选中指定下标。' },
+  { name: 'center', kind: 'method', doc: '窗口居中。' },
+  { name: 'minimize', kind: 'method', doc: '最小化窗口。' },
+  { name: 'close', kind: 'method', doc: '关闭窗口。' },
+  { name: 'use', kind: 'method', doc: '切换后续控件默认放入的窗口。' },
+  { name: 'activate', kind: 'method', doc: '激活窗口。' },
+  { name: 'load', kind: 'method', doc: '重新加载图片。' },
+  { name: 'set_src', kind: 'method', doc: '更换图片路径。' },
+  { name: 'add_row', kind: 'method', doc: '向表格追加一行。' },
+  { name: 'set_cell', kind: 'method', doc: '写入表格单元格。' },
+  { name: 'get_cell', kind: 'method', doc: '读取表格单元格。' },
+  { name: 'item', kind: 'method', doc: '添加菜单项。' },
+  { name: 'submenu', kind: 'method', doc: '添加子菜单。' },
+  { name: 'separator', kind: 'method', doc: '添加菜单分隔线。' },
+  { name: 'format', kind: 'method', doc: '富文本格式化写入。' },
+];
+
+export const KEYWORDS: ApiEntry[] = [
+  { name: 'if', kind: 'keyword', doc: '条件分支（中文：`如果`）。' },
+  { name: 'elif', kind: 'keyword', doc: '否则如果分支（中文：`否则如果`）。' },
+  { name: 'else', kind: 'keyword', doc: '否则分支（中文：`否则`）。' },
+  { name: 'while', kind: 'keyword', doc: '循环（中文：`当`）。' },
+  { name: 'for', kind: 'keyword', doc: '遍历（中文：`对于`）。' },
+  { name: 'in', kind: 'keyword', doc: '遍历 / 成员判断（中文：`在`）。' },
+  { name: 'func', kind: 'keyword', doc: '定义函数（中文：`函数`）。' },
+  { name: 'return', kind: 'keyword', doc: '返回值（中文：`返回`）。' },
+  { name: 'break', kind: 'keyword', doc: '跳出循环（中文：`中断`）。' },
+  { name: 'continue', kind: 'keyword', doc: '进入下一轮循环（中文：`继续`）。' },
+  { name: 'on', kind: 'keyword', doc: '注册事件，如 `on btn.click:`（中文：`监听`）。' },
+  { name: 'pass', kind: 'keyword', doc: '空语句（中文：`略过`）。' },
+  { name: 'try', kind: 'keyword', doc: '异常捕获开始（中文：`尝试`）。' },
+  { name: 'catch', kind: 'keyword', doc: '捕获异常并绑定变量（中文：`捕获`）。' },
+  { name: 'import', kind: 'keyword', doc: '导入其他 .ag 文件（中文：`导入`）。' },
+  { name: 'lambda', kind: 'keyword', doc: '匿名函数（中文：`匿名`）。' },
+  { name: 'and', kind: 'keyword', doc: '逻辑与（中文：`并且` / `且`）。' },
+  { name: 'or', kind: 'keyword', doc: '逻辑或（中文：`或者` / `或`）。' },
+  { name: 'not', kind: 'keyword', doc: '逻辑非（中文：`非`）。' },
+  { name: 'true', kind: 'keyword', doc: '布尔真（中文：`真`）。' },
+  { name: 'false', kind: 'keyword', doc: '布尔假（中文：`假`）。' },
+  { name: 'null', kind: 'keyword', doc: '空值（中文：`空`）。' },
+];
+
+/** 补全去重用的全部 API 条目。 */
+export const ALL_ENTRIES: ApiEntry[] = [
+  ...WIDGETS,
+  ...GUI_FUNCTIONS,
+  ...BUILTINS,
+  ...KEYWORDS,
+  ...PROPERTIES,
+  ...METHODS,
+];

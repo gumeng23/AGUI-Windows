@@ -1,0 +1,29 @@
+# 富文本编辑框演示
+window("富文本编辑框", 720, 560, bg="#F8FAFC")
+
+r = richedit("", x=24, y=20, w=650, h=390, bg="#FFFFFF")
+
+r.append("Agui 富文本编辑框\n", bold=true, size=22, color="#1D4ED8")
+r.append("支持粗体、斜体、下划线、字号、字体和前景色。\n\n", italic=true, color="#475569")
+r.append("重要提示：", bold=true, color="#DC2626")
+r.append("这段文字是普通正文。\n", color="#0F172A")
+r.append("链接样式", underline=true, color="#2563EB")
+r.append("  ·  ", color="#94A3B8")
+r.append("绿色成功", bold=true, color="#16A34A")
+r.append("  ·  ", color="#94A3B8")
+r.append("橙色警告", bold=true, color="#EA580C")
+r.append("\n\n还可以继续输入，格式会跟随插入点。", color="#64748B")
+
+label("提示：点击上方按钮可以追加不同样式的段落。", x=24, y=426, fg="#475569")
+b1 = button("追加粗体", x=24, y=462, w=150, h=40, bg="#1D4ED8", fg="#FFFFFF")
+b2 = button("追加斜体", x=188, y=462, w=150, h=40, bg="#0F766E", fg="#FFFFFF")
+b3 = button("追加红色", x=352, y=462, w=150, h=40, bg="#DC2626", fg="#FFFFFF")
+
+on b1.click:
+    r.append("\n这是新追加的粗体文字。", bold=true, color="#111827")
+
+on b2.click:
+    r.append("\n这是新追加的斜体文字。", italic=true, color="#0F766E")
+
+on b3.click:
+    r.append("\n这是新追加的红色文字。", bold=true, color="#DC2626")

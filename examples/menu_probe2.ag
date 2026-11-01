@@ -1,0 +1,7 @@
+window("menu probe", 520, 320)
+m = menu("文件")
+it = m.item("打开", accel="Ctrl+O", icon="assets/agui.png")
+print("accel", it.accel, "icon", it.icon, "has_icon", it.has_icon)
+sub = m.submenu("最近")
+sub.item("a.ag")
+after(500, quit)

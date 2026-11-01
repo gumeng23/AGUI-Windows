@@ -1,0 +1,202 @@
+{
+  "name": "agui",
+  "displayName": "Agui",
+  "description": "Agui（.ag）语言支持：语法高亮、语法检查、运行脚本与打包 EXE。",
+  "version": "0.1.0",
+  "publisher": "agui",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "agui",
+    "ag",
+    "gui",
+    "windows",
+    "中文编程"
+  ],
+  "icon": "icons/agui.png",
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:agui"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "agui",
+        "aliases": [
+          "Agui",
+          "agui",
+          "ag"
+        ],
+        "extensions": [
+          ".ag"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/agui.png",
+          "dark": "./icons/agui.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "agui",
+        "scopeName": "source.agui",
+        "path": "./syntaxes/agui.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "agui",
+        "path": "./snippets/agui.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "agui.run",
+        "title": "运行脚本",
+        "category": "Agui",
+        "icon": "$(play)"
+      },
+      {
+        "command": "agui.check",
+        "title": "语法检查",
+        "category": "Agui",
+        "icon": "$(check)"
+      },
+      {
+        "command": "agui.build",
+        "title": "打包为 EXE",
+        "category": "Agui",
+        "icon": "$(package)"
+      },
+      {
+        "command": "agui.selectExecutable",
+        "title": "设置 agui.exe 路径",
+        "category": "Agui",
+        "icon": "$(wrench)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "agui.run",
+          "when": "resourceLangId == agui",
+          "group": "navigation@1"
+        },
+        {
+          "command": "agui.check",
+          "when": "resourceLangId == agui",
+          "group": "navigation@2"
+        },
+        {
+          "command": "agui.build",
+          "when": "resourceLangId == agui",
+          "group": "navigation@3"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "agui.run",
+          "when": "resourceLangId == agui",
+          "group": "agui@1"
+        },
+        {
+          "command": "agui.check",
+          "when": "resourceLangId == agui",
+          "group": "agui@2"
+        },
+        {
+          "command": "agui.build",
+          "when": "resourceLangId == agui",
+          "group": "agui@3"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "agui.run",
+          "when": "resourceExtname == .ag",
+          "group": "navigation@1"
+        },
+        {
+          "command": "agui.build",
+          "when": "resourceExtname == .ag",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "agui.run",
+        "key": "ctrl+f5",
+        "when": "editorLangId == agui"
+      },
+      {
+        "command": "agui.check",
+        "key": "ctrl+alt+c",
+        "when": "editorLangId == agui"
+      },
+      {
+        "command": "agui.build",
+        "key": "ctrl+alt+b",
+        "when": "editorLangId == agui"
+      }
+    ],
+    "configuration": {
+      "title": "Agui",
+      "properties": {
+        "agui.path": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "markdownDescription": "`agui.exe` 的路径。留空时自动在工作区根目录、扩展所在目录和 `PATH` 中查找。支持 `${workspaceFolder}` 变量，也可以只写可执行文件名。"
+        },
+        "agui.checkOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "保存 .ag 文件时自动做语法检查。"
+        },
+        "agui.checkOnType": {
+          "type": "boolean",
+          "default": true,
+          "description": "编辑 .ag 文件时自动做语法检查（防抖）。"
+        },
+        "agui.checkDelay": {
+          "type": "number",
+          "default": 700,
+          "minimum": 100,
+          "maximum": 10000,
+          "description": "编辑时语法检查的防抖延迟（毫秒）。"
+        },
+        "agui.buildOutputDir": {
+          "type": "string",
+          "default": "out",
+          "scope": "resource",
+          "description": "打包 EXE 的输出目录，相对路径以当前 .ag 文件所在目录为准。"
+        },
+        "agui.buildOptions": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "markdownDescription": "打包时附加给 `agui build` 的参数，例如 `--icon assets/app.ico --product \"我的工具\"`。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -w -p .",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^4.1.0",
+    "typescript": "^5.6.0"
+  }
+}

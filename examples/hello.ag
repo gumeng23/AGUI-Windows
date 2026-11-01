@@ -1,0 +1,14 @@
+# hello.ag —— 最小窗口
+win = window("你好，Agui", w=560, h=320)
+
+label("欢迎使用 Agui！", fg="#1D4ED8")
+label("用缩进写界面，用 on 写事件。", fg="#555555")
+
+ok = button("点我", x=20, y=190, w=150)
+close = button("关闭", x=190, y=190, w=150)
+
+on ok.click:
+    msgbox("你好！这是第一个 Agui 程序。")
+
+on close.click:
+    win.close()

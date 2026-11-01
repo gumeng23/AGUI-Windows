@@ -1,0 +1,22 @@
+# menu.ag —— 菜单栏与菜单项事件
+win = window("菜单示例", w=600, h=360)
+
+file = menu("文件(&F)")
+open = file.item("打开(&O)...")
+file.separator()
+file.item("退出(&X)", quit)
+
+help = menu("帮助(&H)")
+about = help.item("关于 Agui")
+
+label("从上面的菜单试试“文件”和“帮助”。", fg="#333333")
+edit("", w=420)
+
+on open.click:
+    msgbox("这里可以调用 open_file() 选择文件")
+
+on about.click:
+    msgbox("Agui 0.1\n用类 Python 脚本写原生 Windows GUI", title="关于")
+
+on win.close:
+    print("菜单示例关闭")

@@ -1,0 +1,176 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Agui",
+  "scopeName": "source.agui",
+  "fileTypes": ["ag"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#event-handler" },
+    { "include": "#function-definition" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#constants" },
+    { "include": "#logical-operators" },
+    { "include": "#constructors" },
+    { "include": "#gui-functions" },
+    { "include": "#builtin-functions" },
+    { "include": "#keyword-arguments" },
+    { "include": "#property-access" },
+    { "include": "#operators" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "match": "(?:#|//).*$",
+          "name": "comment.line.number-sign.agui"
+        }
+      ]
+    },
+    "event-handler": {
+      "patterns": [
+        {
+          "match": "\\b(on|监听)(\\s+)([\\p{L}\\p{N}_]+)(\\.)([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.control.event.agui" },
+            "3": { "name": "variable.other.object.agui" },
+            "4": { "name": "punctuation.accessor.agui" },
+            "5": { "name": "entity.name.function.event.agui" }
+          }
+        }
+      ]
+    },
+    "function-definition": {
+      "patterns": [
+        {
+          "match": "\\b(func|函数)(\\s+)([\\p{L}\\p{N}_]+)",
+          "captures": {
+            "1": { "name": "storage.type.function.agui" },
+            "3": { "name": "entity.name.function.agui" }
+          }
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "begin": "\"",
+          "end": "\"",
+          "name": "string.quoted.double.agui",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.agui"
+            }
+          ]
+        },
+        {
+          "begin": "'",
+          "end": "'",
+          "name": "string.quoted.single.agui",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.agui"
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "match": "\\b(?:0[xX][0-9a-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+          "name": "constant.numeric.agui"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "match": "\\b(?:elif|else|while|for|func|return|break|continue|on|pass|try|catch|import|lambda|in|if)\\b|(?:否则如果|如果|否则|当|对于|在|函数|返回|中断|继续|监听|略过|尝试|捕获|导入|匿名)",
+          "name": "keyword.control.agui"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "match": "\\b(?:true|false|null)\\b|(?:真|假|空)",
+          "name": "constant.language.agui"
+        }
+      ]
+    },
+    "logical-operators": {
+      "patterns": [
+        {
+          "match": "\\b(?:and|or|not)\\b|(?:并且|且|或者|或|非)",
+          "name": "keyword.operator.logical.agui"
+        }
+      ]
+    },
+    "constructors": {
+      "patterns": [
+        {
+          "match": "\\b(?:window|menu|label|button|checkbox|edit|richedit|listbox|combo|progress|slider|image|table|font)\\b(?=\\s*\\()",
+          "name": "support.class.agui"
+        }
+      ]
+    },
+    "gui-functions": {
+      "patterns": [
+        {
+          "match": "\\b(?:msgbox|confirm|input|open_file|save_file|after|every|async|cancel_timer|run|quit|screenshot|set_clipboard|get_clipboard|screen_width|screen_height|dpi)\\b(?=\\s*\\()",
+          "name": "support.function.gui.agui"
+        }
+      ]
+    },
+    "builtin-functions": {
+      "patterns": [
+        {
+          "match": "\\b(?:print|warn|debug_vars|str|num|int|bool|type|len|range|list|dict|append|pop|insert|remove|keys|values|items|has|get|set|sort|reverse|join|split|upper|lower|trim|replace|contains|startswith|endswith|substr|find|format|abs|round|floor|ceil|sqrt|pow|min|max|sum|random|randint|now|timestamp|sleep|set_recursion_limit|get_recursion_limit|read_file|write_file|append_file|file_exists|delete_file|list_dir|mkdir|basename|dirname|join_path|abs_path|cwd)\\b(?=\\s*\\()",
+          "name": "support.function.builtin.agui"
+        }
+      ]
+    },
+    "keyword-arguments": {
+      "patterns": [
+        {
+          "match": "(?<=[(,])[ ]*([A-Za-z_][A-Za-z0-9_]*)(?=\\s*=(?!=))",
+          "captures": {
+            "1": { "name": "variable.parameter.agui" }
+          }
+        }
+      ]
+    },
+    "property-access": {
+      "patterns": [
+        {
+          "match": "(\\.)([\\p{L}\\p{N}_]+)",
+          "captures": {
+            "1": { "name": "punctuation.accessor.agui" },
+            "2": { "name": "variable.other.property.agui" }
+          }
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "match": "==|!=|<=|>=|\\+=|-=|\\*=|/=|[-+*/%=<>!]",
+          "name": "keyword.operator.agui"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "match": "[(){}\\[\\],:;]",
+          "name": "punctuation.separator.agui"
+        }
+      ]
+    }
+  }
+}

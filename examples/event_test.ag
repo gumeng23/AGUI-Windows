@@ -1,0 +1,14 @@
+# 自动点击测试：不依赖人工操作，验证事件与属性更新
+win = window("事件测试", w=440, h=300)
+count = 0
+big = font("Microsoft YaHei UI", 40, bold=true)
+display = label("0", font=big, h=70, fg="#1D4ED8")
+
+add = button("+1", w=160)
+on add.click:
+    count += 1
+    display.text = str(count)
+
+add.click()
+add.click()
+add.click()

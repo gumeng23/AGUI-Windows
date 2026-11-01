@@ -1,0 +1,21 @@
+window("TreeView", 560, 460)
+head = label("项目结构", font=font("Microsoft YaHei UI", 12, bold=true))
+t = tree([
+    ["src", ["main.go", "gui", ["window.go", "widget.go"]]],
+    ["docs", ["language.md", "signing.md"]],
+    "README.md",
+], h=280)
+status = label("未选中")
+on t.select:
+    status.text = "选中：" + t.selected
+on t.expand:
+    status.text = "展开/收起"
+t.expand_all()
+print("tree count=" + str(t.count))
+t.select("window.go")
+print("selected=" + t.selected)
+btn = button("添加节点", fg="#ffffff", bg="#0f766e")
+on btn.click:
+    t.add_child("docs", "新文档.md")
+    t.select("新文档.md")
+after(2500, quit)

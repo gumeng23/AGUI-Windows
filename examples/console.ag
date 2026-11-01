@@ -1,0 +1,20 @@
+# console.ag —— 先验证解释器（不创建窗口）
+print("hello agui")
+
+func add(a, b):
+    return a + b
+
+print("1 + 2 =", add(1, 2))
+
+total = 0
+for i in range(5):
+    total += i
+print("sum =", total)
+
+d = {"name": "Agui", "year": 2026}
+for k in d.keys():
+    print(k, "=>", d[k])
+
+items = ["b", "a", "c"]
+items.sort()
+print(items.join(","), items.len())

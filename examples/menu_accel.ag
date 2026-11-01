@@ -1,0 +1,8 @@
+window("Accel 测试", 420, 300)
+status = label("等待 Ctrl+O ...")
+f = menu("文件")
+open_item = f.item("打开", accel="Ctrl+O")
+on open_item.click:
+    status.text = "已触发 Ctrl+O"
+    write_file("build/accel_hit.txt", "hit")
+after(60000, quit)

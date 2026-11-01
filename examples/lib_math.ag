@@ -1,0 +1,8 @@
+# lib_math.ag —— 被 import 的模块
+func square(x):
+    return x * x
+
+func cube(x):
+    return x * x * x
+
+module_name = "lib_math"

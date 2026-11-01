@@ -1,0 +1,20 @@
+# counter.ag —— 用事件和变量做一个计数器
+win = window("计数器", w=440, h=340)
+
+count = 0
+big = font("Microsoft YaHei UI", 40, bold=true)
+display = label("0", font=big, h=70, fg="#1D4ED8")
+
+add = button("+1", w=160)
+reset = button("重置", w=160)
+
+on add.click:
+    count += 1
+    display.text = str(count)
+
+on reset.click:
+    count = 0
+    display.text = "0"
+
+on win.close:
+    print("窗口关闭，最终计数：", count)

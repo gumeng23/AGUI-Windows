@@ -1,0 +1,14 @@
+# 构建产物
+/agui.exe
+/aguiw.exe
+
+# 本地 Go 构建缓存（沙箱环境使用）
+/.gocache/
+/.gotmp/
+
+# 打包输出与截图
+/build/
+/shots/
+
+# 示例运行时生成的数据
+/todo.txt

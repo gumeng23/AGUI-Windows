@@ -1,0 +1,264 @@
+# calculator.ag —— 支持加减乘除的四则运算计算器
+# 运行： .\agui.exe run examples\calculator.ag
+# 打包： .\agui.exe build examples\calculator.ag -o calculator.exe
+#
+# 说明：Agui 的顶层窗口有 480x360（外框）的最小尺寸，
+# 这样 320 宽的小窗会被系统撑宽，所以这里直接按 464 宽（最小客户区）设计。
+
+win = window("计算器", w=464, h=448, bg="#EEF2F7")
+
+big = font("Consolas", 30, bold=true)
+small = font("Consolas", 11)
+bfont = font("Microsoft YaHei UI", 18, bold=true)
+
+hint = font("Microsoft YaHei UI", 16, bold=true)
+
+hist = label("", x=20, y=14, w=424, h=20, font=small, fg="#6B7280")
+disp = label("0", x=20, y=38, w=424, h=62, font=big, fg="#111827")
+# 除零等错误提示：平时隐藏，出错时显示在显示屏中间
+err = label("", x=20, y=52, w=424, h=36, font=hint, fg="#DC2626")
+err.visible = false
+
+# ---------- 状态 ----------
+entry = "0"        # 正在输入的数字（字符串，保留小数点）
+acc = 0            # 已累积的值
+acc_disp = "0"     # 累积值的显示文本
+op = ""            # 待执行的运算符（+ - * /），空串表示没有
+op_sym = ""        # 运算符的显示符号（+ − × ÷）
+fresh = true       # 下一个数字是否重新开始
+failed = false     # 是否处于除零错误状态
+
+# ---------- 工具函数 ----------
+func fmt(v):
+    # 结果最多保留 9 位小数，并去掉浮点误差带来的长尾巴
+    if abs(v) >= 1000000000:
+        return str(round(v))
+    if v == 0:
+        return "0"
+    return str(round(v * 1000000000) / 1000000000)
+
+func cur():
+    try:
+        return num(entry)
+    catch e:
+        return 0
+
+func pad_left(s, n):
+    p = n - len(s)
+    if p < 0:
+        p = 0
+    return (" " * p) + s
+
+func refresh():
+    if failed:
+        disp.text = ""
+        err.text = "不能除以 0"
+        err.visible = true
+        return
+    err.visible = false
+    disp.text = pad_left(entry, 18)
+
+func reset_all():
+    entry = "0"
+    acc = 0
+    acc_disp = "0"
+    op = ""
+    op_sym = ""
+    fresh = true
+    failed = false
+    hist.text = ""
+    refresh()
+
+func calc():
+    b = cur()
+    try:
+        if op == "+":
+            r = acc + b
+        elif op == "-":
+            r = acc - b
+        elif op == "*":
+            r = acc * b
+        else:
+            r = acc / b
+    catch e:
+        failed = true
+        op = ""
+        entry = "0"
+        hist.text = ""
+        refresh()
+        return
+    acc = r
+    acc_disp = fmt(r)
+    entry = acc_disp
+    op = ""
+    refresh()
+
+# ---------- 按键逻辑 ----------
+func press(d):
+    if failed:
+        reset_all()
+    if fresh:
+        entry = d
+        fresh = false
+    elif entry == "0":
+        entry = d
+    elif len(entry) < 12:
+        entry = entry + d
+    if op == "":
+        hist.text = ""
+    refresh()
+
+func dot():
+    if failed:
+        reset_all()
+    if fresh:
+        entry = "0."
+        fresh = false
+    elif not contains(entry, "."):
+        entry = entry + "."
+    refresh()
+
+func negate():
+    if failed:
+        reset_all()
+    if entry == "0":
+        return
+    if startswith(entry, "-"):
+        entry = substr(entry, 1, len(entry) - 1)
+    else:
+        entry = "-" + entry
+    refresh()
+
+func backspace():
+    if failed:
+        reset_all()
+        return
+    if fresh:
+        return
+    if len(entry) <= 1:
+        entry = "0"
+    else:
+        entry = substr(entry, 0, len(entry) - 1)
+        if entry == "-":
+            entry = "0"
+    refresh()
+
+func choose(o, sym):
+    if failed:
+        return
+    if op != "" and fresh:
+        # 连续点运算符：只替换运算符
+        op = o
+        op_sym = sym
+        hist.text = pad_left(acc_disp + " " + sym, 52)
+        return
+    if op != "":
+        calc()
+        if failed:
+            return
+    else:
+        acc = cur()
+        acc_disp = entry
+    op = o
+    op_sym = sym
+    hist.text = pad_left(acc_disp + " " + sym, 52)
+    fresh = true
+
+func equals():
+    if failed:
+        reset_all()
+        return
+    if op == "":
+        return
+    hist.text = pad_left(acc_disp + " " + op_sym + " " + entry + " =", 52)
+    calc()
+    fresh = true
+
+# ---------- 第一行：C  ⌫  ±  ÷ ----------
+b_c = button("C", x=20, y=116, w=100, h=56, font=bfont, bg="#FEE2E2", fg="#B91C1C")
+b_back = button("⌫", x=128, y=116, w=100, h=56, font=bfont, bg="#E5E7EB", fg="#374151")
+b_neg = button("±", x=236, y=116, w=100, h=56, font=bfont, bg="#E5E7EB", fg="#374151")
+b_div = button("÷", x=344, y=116, w=100, h=56, font=bfont, bg="#DBEAFE", fg="#1D4ED8")
+
+# ---------- 第二行：7  8  9  × ----------
+b7 = button("7", x=20, y=180, w=100, h=56, font=bfont, bg="#FFFFFF", fg="#111827")
+b8 = button("8", x=128, y=180, w=100, h=56, font=bfont, bg="#FFFFFF", fg="#111827")
+b9 = button("9", x=236, y=180, w=100, h=56, font=bfont, bg="#FFFFFF", fg="#111827")
+b_mul = button("×", x=344, y=180, w=100, h=56, font=bfont, bg="#DBEAFE", fg="#1D4ED8")
+
+# ---------- 第三行：4  5  6  − ----------
+b4 = button("4", x=20, y=244, w=100, h=56, font=bfont, bg="#FFFFFF", fg="#111827")
+b5 = button("5", x=128, y=244, w=100, h=56, font=bfont, bg="#FFFFFF", fg="#111827")
+b6 = button("6", x=236, y=244, w=100, h=56, font=bfont, bg="#FFFFFF", fg="#111827")
+b_sub = button("−", x=344, y=244, w=100, h=56, font=bfont, bg="#DBEAFE", fg="#1D4ED8")
+
+# ---------- 第四行：1  2  3  + ----------
+b1 = button("1", x=20, y=308, w=100, h=56, font=bfont, bg="#FFFFFF", fg="#111827")
+b2 = button("2", x=128, y=308, w=100, h=56, font=bfont, bg="#FFFFFF", fg="#111827")
+b3 = button("3", x=236, y=308, w=100, h=56, font=bfont, bg="#FFFFFF", fg="#111827")
+b_add = button("+", x=344, y=308, w=100, h=56, font=bfont, bg="#DBEAFE", fg="#1D4ED8")
+
+# ---------- 第五行：0  .  = ----------
+b0 = button("0", x=20, y=372, w=208, h=56, font=bfont, bg="#FFFFFF", fg="#111827")
+b_dot = button(".", x=236, y=372, w=100, h=56, font=bfont, bg="#FFFFFF", fg="#111827")
+b_eq = button("=", x=344, y=372, w=100, h=56, font=bfont, bg="#2563EB", fg="#FFFFFF")
+
+# ---------- 事件 ----------
+on b_c.click:
+    reset_all()
+
+on b_back.click:
+    backspace()
+
+on b_neg.click:
+    negate()
+
+on b_div.click:
+    choose("/", "÷")
+
+on b_mul.click:
+    choose("*", "×")
+
+on b_sub.click:
+    choose("-", "−")
+
+on b_add.click:
+    choose("+", "+")
+
+on b7.click:
+    press("7")
+
+on b8.click:
+    press("8")
+
+on b9.click:
+    press("9")
+
+on b4.click:
+    press("4")
+
+on b5.click:
+    press("5")
+
+on b6.click:
+    press("6")
+
+on b1.click:
+    press("1")
+
+on b2.click:
+    press("2")
+
+on b3.click:
+    press("3")
+
+on b0.click:
+    press("0")
+
+on b_dot.click:
+    dot()
+
+on b_eq.click:
+    equals()
+
+refresh()

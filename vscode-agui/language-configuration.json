@@ -1,0 +1,38 @@
+{
+  "comments": {
+    "lineComment": "#"
+  },
+  "brackets": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"]
+  ],
+  "autoClosingPairs": [
+    { "open": "{", "close": "}" },
+    { "open": "[", "close": "]" },
+    { "open": "(", "close": ")" },
+    { "open": "\"", "close": "\"", "notIn": ["string", "comment"] },
+    { "open": "'", "close": "'", "notIn": ["string", "comment"] }
+  ],
+  "surroundingPairs": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"],
+    ["\"", "\""],
+    ["'", "'"]
+  ],
+  "wordPattern": "(-?\\d*\\.?\\d+)|([A-Za-z_\\u00C0-\\uFFFF][A-Za-z0-9_\\u00C0-\\uFFFF]*)",
+  "indentationRules": {
+    "increaseIndentPattern": "^\\s*(if|elif|else|while|for|func|on|try|catch|import|如果|否则如果|否则|当|对于|函数|监听|尝试|捕获|导入)\\b.*:\\s*(#.*)?$",
+    "decreaseIndentPattern": "^\\s*(elif|else|catch|否则如果|否则|捕获)\\b.*:\\s*(#.*)?$"
+  },
+  "onEnterRules": [
+    {
+      "beforeText": "^\\s*(if|elif|else|while|for|func|on|try|catch|如果|否则如果|否则|当|对于|函数|监听|尝试|捕获)\\b.*:\\s*(#.*)?$",
+      "action": { "indent": "indent" }
+    }
+  ],
+  "folding": {
+    "offSide": true
+  }
+}

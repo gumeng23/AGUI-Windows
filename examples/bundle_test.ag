@@ -1,0 +1,16 @@
+# 打包测试：用 agui build 生成独立 exe 后运行
+print("bundle: start")
+win = window("打包测试", w=420, h=240)
+label("这段脚本已经被打包进 exe。")
+b = button("关闭", w=140)
+on b.click:
+    win.close()
+
+func capture_and_quit():
+    print("bundle: capturing")
+    screenshot("shots/bundled.png")
+    print("bundle: captured")
+    quit()
+
+after(900, capture_and_quit)
+print("bundle: scheduled")

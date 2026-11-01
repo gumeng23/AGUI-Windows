@@ -1,0 +1,6 @@
+window("tree dynamic", 420, 320)
+t = tree([["a", ["b", "c"]]], h=200)
+t.add_child("a", "d")
+print("has d", t.has_node("d"), "count", t.count)
+t.select("d")
+print("selected", t.selected)
