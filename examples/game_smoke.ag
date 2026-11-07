@@ -1,0 +1,19 @@
+win = window("Game Kit Smoke", width=360, height=300)
+c = canvas(w=340, h=220)
+t = 0
+
+func update(dt):
+    t = t + dt
+    c.clear()
+    c.rect(20 + t * 20, 40, 60, 40, color="#2563EB", fill=true)
+    c.circle(220, 110, 30, color="#DC2626", fill=true)
+    c.text(20, 180, "dt=" + str(dt) + " t=" + str(t), color="#111827", size=14)
+
+func draw(alpha):
+    pass
+
+func stop():
+    quit()
+
+game_loop(update, draw, 30)
+after(2000, stop)

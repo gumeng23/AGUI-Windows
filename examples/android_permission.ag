@@ -1,0 +1,18 @@
+#target android
+#name 权限示例
+#package com.agui.permission
+#version 0.1.0
+#permission android.permission.CAMERA
+
+win = window("权限示例")
+status = label("尚未请求权限")
+btn = button("请求相机权限")
+
+on btn.click:
+    request_permission("android.permission.CAMERA")
+
+on win.permission:
+    if win.permission_granted:
+        status.text = "已授权：" + win.permission
+    else:
+        status.text = "已拒绝：" + win.permission

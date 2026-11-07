@@ -37,6 +37,7 @@ type App struct {
 	margin    int32
 	gap       int32
 	fontSize  float64
+	darkTheme bool
 
 	dpi   int32
 	scale float64
@@ -48,24 +49,31 @@ type App struct {
 	brushes    map[uint32]syscall.Handle
 	fonts      []syscall.Handle
 
-	timers        map[uintptr]*timerEntry
-	nextTimer     uintptr
-	asyncMu       sync.Mutex
-	asyncFns      map[uintptr]func()
-	nextAsync     uintptr
-	tasks         []*lang.Task
-	pendingUI     []func()
-	stopped       bool
-	accelTable    syscall.Handle
-	tableEdits    map[syscall.Handle]*Widget
-	pendingParent *Widget
-	tooltipHwnd   syscall.Handle
-	tooltipText   map[syscall.Handle][]uint16
-	startupShot   string
-	ran           bool
-	running       bool
-	exitCode      int
-	windowStyle   uint32
+	timers         map[uintptr]*timerEntry
+	nextTimer      uintptr
+	asyncMu        sync.Mutex
+	asyncFns       map[uintptr]func()
+	nextAsync      uintptr
+	tasks          []*lang.Task
+	pendingUI      []func()
+	stopped        bool
+	accelTable     syscall.Handle
+	tableEdits     map[syscall.Handle]*Widget
+	pendingParent  *Widget
+	tray           *Tray
+	minimizeToTray bool
+	taskbarMsg     uint32
+	tooltipHwnd    syscall.Handle
+	tooltipText    map[syscall.Handle][]uint16
+	game           *gameRuntime
+	gameImages     map[string]*gameImage
+	gameFonts      map[string]syscall.Handle
+	audio          map[string]*audioChannel
+	startupShot    string
+	ran            bool
+	running        bool
+	exitCode       int
+	windowStyle    uint32
 }
 
 type timerEntry struct {
@@ -93,6 +101,9 @@ func NewApp(i *lang.Interp) *App {
 		asyncFns:    map[uintptr]func(){},
 		tableEdits:  map[syscall.Handle]*Widget{},
 		tooltipText: map[syscall.Handle][]uint16{},
+		gameImages:  map[string]*gameImage{},
+		gameFonts:   map[string]syscall.Handle{},
+		audio:       map[string]*audioChannel{},
 		nextID:      1000,
 		nextTimer:   1,
 		margin:      20,
@@ -135,6 +146,9 @@ func NewApp(i *lang.Interp) *App {
 		panic(err)
 	}
 	i.SetDispatcher(a.Post)
+	if msg, _, _ := pRegisterWindowMs.Call(uintptr(unsafe.Pointer(u16("TaskbarCreated")))); msg != 0 {
+		a.taskbarMsg = uint32(msg)
+	}
 	currentApp = a
 	return a
 }
@@ -775,7 +789,21 @@ func mainWndProc(hwnd, msg, wparam, lparam uintptr) (ret uintptr) {
 	if a == nil {
 		return defWindowProc(h, uint32(msg), wparam, lparam)
 	}
+	if a.taskbarMsg != 0 && uint32(msg) == a.taskbarMsg {
+		a.onTaskbarCreated()
+		return 0
+	}
 	switch uint32(msg) {
+	case wmTray:
+		a.handleTray(lparam)
+		return 0
+
+	case 0x0112: // WM_SYSCOMMAND
+		if uint32(wparam&0xFFF0) == scMinimize && a.minimizeToTray {
+			pShowWindow.Call(uintptr(h), 0) // SW_HIDE
+			return 0
+		}
+
 	case wmCommand:
 		id := int(wparam & 0xFFFF)
 		code := int((wparam >> 16) & 0xFFFF)
@@ -818,6 +846,8 @@ func mainWndProc(hwnd, msg, wparam, lparam uintptr) (ret uintptr) {
 					w.syncDateFromControl()
 					w.emit("change")
 				}
+			case "richedit":
+				w.richNotify(hdr.code, lparam)
 			}
 		}
 		return 0
@@ -844,6 +874,14 @@ func mainWndProc(hwnd, msg, wparam, lparam uintptr) (ret uintptr) {
 				a.reportError(err)
 			}
 		}
+		return 0
+
+	case wmKeyDown, wmSysKeyDown:
+		a.handleKeyMessage(h, uint32(wparam), true)
+		return 0
+
+	case wmKeyUp, wmSysKeyUp:
+		a.handleKeyMessage(h, uint32(wparam), false)
 		return 0
 
 	case wmClose:

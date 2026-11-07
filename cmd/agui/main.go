@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"agui/internal/ast"
@@ -18,7 +19,7 @@ import (
 	"agui/internal/winres"
 )
 
-const version = "0.5.0"
+const version = "0.9.1"
 
 // embedMagic marks a trailing script appended by `agui build`.
 const embedMagic = "AGUIEMB\x01"
@@ -72,6 +73,69 @@ func main() {
 			os.Exit(2)
 		}
 		buildFile(file, out, opts)
+	case "dist":
+		if err := distApp(args[1:]); err != nil {
+			fmt.Fprintln(os.Stderr, "错误："+err.Error())
+			os.Exit(1)
+		}
+	case "update":
+		if err := runUpdate(args[1:]); err != nil {
+			fmt.Fprintln(os.Stderr, "错误："+err.Error())
+			os.Exit(1)
+		}
+	case "install":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "用法：agui install <URL或目录/文件> [包名]")
+			os.Exit(2)
+		}
+		name := ""
+		if len(args) >= 3 {
+			name = args[2]
+		}
+		if err := installPackage(args[1], name); err != nil {
+			fmt.Fprintln(os.Stderr, "错误："+err.Error())
+			os.Exit(1)
+		}
+	case "list":
+		if err := listPackages(); err != nil {
+			fmt.Fprintln(os.Stderr, "错误："+err.Error())
+			os.Exit(1)
+		}
+	case "remove":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "用法：agui remove <包名>")
+			os.Exit(2)
+		}
+		if err := removePackage(args[1]); err != nil {
+			fmt.Fprintln(os.Stderr, "错误："+err.Error())
+			os.Exit(1)
+		}
+	case "debug":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "用法：agui debug <脚本.ag> [参数...]")
+			os.Exit(2)
+		}
+		os.Setenv("AGUI_TRACE", "1")
+		runFile(args[1], "", args[2:], true, false)
+	case "watch":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "用法：agui watch <脚本.ag> [参数...]")
+			os.Exit(2)
+		}
+		if err := watchFile(args[1], args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, "错误："+err.Error())
+			os.Exit(1)
+		}
+	case "lsp":
+		if err := runLSP(); err != nil {
+			fmt.Fprintln(os.Stderr, "LSP 错误："+err.Error())
+			os.Exit(1)
+		}
+	case "verify":
+		if err := verifyLock(); err != nil {
+			fmt.Fprintln(os.Stderr, "错误："+err.Error())
+			os.Exit(1)
+		}
 	case "version", "--version", "-v":
 		fmt.Printf("Agui %s\n", version)
 	case "help", "-h", "--help":
@@ -88,13 +152,22 @@ func main() {
 }
 
 func usage() {
-	fmt.Print(`Agui - 用类 Python 的脚本写 Windows 桌面程序
+	fmt.Print(`Agui - 用类 Python 的脚本写 Windows / Android 原生小程序
 
 用法：
   agui run  <脚本.ag> [参数...]      运行脚本
   agui check <脚本.ag>               只做语法检查
   agui init [目录] [--name 名称]     生成一个可运行的示例项目
-  agui build <脚本.ag> [-o 输出.exe] 把脚本打包成独立 exe（默认无控制台）
+  agui build <脚本.ag> [-o 输出]    按 #target 打包 exe 或 apk（默认 Windows exe）
+  agui dist <脚本.ag>               生成 Windows 绿色包/安装脚本/update.json
+  agui update check|apply <清单>    检查或应用自动更新（--current 当前exe）
+  agui install <源> [包名]           安装 .ag 包（URL/本地文件/目录）到 packages/
+  agui list                          列出已安装的包
+  agui remove <包名>                 删除已安装的包
+  agui verify                        按 agui.lock 校验包 SHA-256
+  agui watch <脚本.ag> [参数...]     文件变化时自动重启
+  agui debug <脚本.ag> [参数...]     逐行跟踪（轻量调试器）
+  agui lsp                           启动 LSP（stdio）
   agui version                       显示版本
 
 运行选项：
@@ -102,20 +175,31 @@ func usage() {
   --debug                            调试模式：输出事件/调用日志，出错时打印全局变量
 
 打包选项：
-  -o <文件>                          输出文件名，默认与脚本同名
+  -o <文件>                          输出文件名，默认与脚本同名（Windows .exe / Android .apk）
+  --aab                              Android 构建为 .aab（App Bundle，未签名）
   -console                           强制复用当前控制台版本（默认优先找同目录 aguiw.exe）
   --asset <文件/目录>                嵌入资源，可重复；目录按目录名挂载
-  --icon <app.ico>                   嵌入 exe 图标
+  --icon <图标>                      嵌入图标（Windows .ico / Android .png）
   --product <名称>                   产品名称（版本信息）
   --company <名称>                   公司名称
   --description <文字>               文件说明
   --copyright <文字>                 版权信息
   --file-version <1.2.3.4>           文件版本，默认 1.0.0.0
+  --release                          Android release 构建（必须同时给 --ks/--ks-pass）
+  --version-code <n>                 Android versionCode，默认 1
+
+文件头（可选，仅入口文件）：
+  #target android                    目标平台，缺省 windows
+  #name 星野养成                      应用名称
+  #package com.example.star          Android 包名
+  #version 0.1.0                     版本
+  #icon assets/icon.png              应用图标（相对脚本目录）
 
 示例：
   agui init demo
   agui run examples/counter.ag
   agui build examples/counter.ag -o counter.exe --icon assets/app.ico --product 计数器
+  agui build examples/android_star.ag -o star.apk
 `)
 }
 
@@ -188,6 +272,13 @@ type buildOptions struct {
 	copyright   string
 	version     string
 	console     bool
+	release     bool
+	ks          string
+	ksPass      string
+	keyAlias    string
+	keyPass     string
+	versionCode int
+	aab         bool
 }
 
 func parseBuildArgs(args []string) (file, out string, opts buildOptions, err error) {
@@ -214,6 +305,54 @@ func parseBuildArgs(args []string) (file, out string, opts buildOptions, err err
 			out = strings.TrimPrefix(a, "--output=")
 		case a == "-console" || a == "--console":
 			opts.console = true
+		case a == "--release":
+			opts.release = true
+		case a == "--aab":
+			opts.aab = true
+		case a == "--ks":
+			v, ok := next(a)
+			if !ok {
+				return "", "", opts, err
+			}
+			opts.ks = v
+		case strings.HasPrefix(a, "--ks="):
+			opts.ks = strings.TrimPrefix(a, "--ks=")
+		case a == "--ks-pass":
+			v, ok := next(a)
+			if !ok {
+				return "", "", opts, err
+			}
+			opts.ksPass = v
+		case strings.HasPrefix(a, "--ks-pass="):
+			opts.ksPass = strings.TrimPrefix(a, "--ks-pass=")
+		case a == "--key-alias":
+			v, ok := next(a)
+			if !ok {
+				return "", "", opts, err
+			}
+			opts.keyAlias = v
+		case strings.HasPrefix(a, "--key-alias="):
+			opts.keyAlias = strings.TrimPrefix(a, "--key-alias=")
+		case a == "--key-pass":
+			v, ok := next(a)
+			if !ok {
+				return "", "", opts, err
+			}
+			opts.keyPass = v
+		case strings.HasPrefix(a, "--key-pass="):
+			opts.keyPass = strings.TrimPrefix(a, "--key-pass=")
+		case a == "--version-code":
+			v, ok := next(a)
+			if !ok {
+				return "", "", opts, err
+			}
+			if n, e := strconv.Atoi(v); e == nil {
+				opts.versionCode = n
+			}
+		case strings.HasPrefix(a, "--version-code="):
+			if n, e := strconv.Atoi(strings.TrimPrefix(a, "--version-code=")); e == nil {
+				opts.versionCode = n
+			}
 		case a == "--asset":
 			v, ok := next(a)
 			if !ok {
@@ -323,6 +462,14 @@ func runSource(src, name string, extra []string, shot string, embedded bool, deb
 		os.Exit(1)
 	}
 	i.SetSource(name, src)
+	if os.Getenv("AGUI_TRACE") == "1" {
+		fmt.Fprintf(os.Stderr, "[debug] 跟踪 %s\n", filepath.Base(name))
+		i.SetTrace(func(line int) {
+			if line >= 1 && line <= len(i.Lines) {
+				fmt.Fprintf(os.Stderr, "[debug] %s:%d  %s\n", filepath.Base(name), line, strings.TrimSpace(i.Lines[line-1]))
+			}
+		})
+	}
 
 	vals := make([]lang.Value, 0, len(extra))
 	for _, a := range extra {
@@ -448,12 +595,12 @@ func registerGUI(i *lang.Interp) (app *gui.App, err error) {
 }
 
 func checkFile(path string) {
-	src, err := os.ReadFile(path)
+	_, src, err := readTargetHeader(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "无法读取脚本：%v\n", err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if _, err := parseSource(string(src)); err != nil {
+	if _, err := parseSource(src); err != nil {
 		fmt.Fprintf(os.Stderr, "%s：%v\n", path, err)
 		os.Exit(1)
 	}
@@ -624,14 +771,27 @@ func collectAssets(paths []string, skip string) (map[string][]byte, error) {
 }
 
 func buildFile(path, out string, opts buildOptions) {
-	src, err := os.ReadFile(path)
+	info, srcText, err := readTargetHeader(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "无法读取脚本：%v\n", err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
+	src := []byte(srcText)
 	if _, err := parseSource(string(src)); err != nil {
 		fmt.Fprintf(os.Stderr, "%s：%v\n", path, err)
 		os.Exit(1)
+	}
+	if info.OS == "android" {
+		if out == "" {
+			base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+			if opts.aab {
+				out = base + ".aab"
+			} else {
+				out = base + ".apk"
+			}
+		}
+		buildAndroid(path, string(src), info, out, opts)
+		return
 	}
 	if out == "" {
 		base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))

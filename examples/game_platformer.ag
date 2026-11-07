@@ -1,0 +1,112 @@
+# Game Kit 平台跳跃示例：移动、跳跃、相机、AABB、粒子、存档
+win = window("平台跳跃 · Game Kit", 820, 520, bg="#0b1220")
+c = canvas(w=780, h=400, bg="#0f172a")
+hud = label("← → / A D 移动    空格 / W 跳跃    S 存档    L 读档", font=font("Microsoft YaHei UI", 11), fg="#cbd5e1")
+
+bind("left", "a", "left")
+bind("right", "d", "right")
+bind("jump", "space", "w", "up")
+
+px = 80
+py = 300
+vx = 0
+vy = 0
+pw = 28
+ph = 36
+on_ground = false
+score = 0
+deaths = 0
+cam_x = 0
+
+platforms = [
+    [0, 390, 900, 40],
+    [120, 300, 180, 18],
+    [360, 240, 160, 18],
+    [600, 330, 180, 18],
+    [800, 260, 120, 18]
+]
+coins = [[160, 255, false], [410, 195, false], [690, 285, false], [840, 215, false]]
+
+func reset_player():
+    px = 80
+    py = 300
+    vx = 0
+    vy = 0
+    on_ground = false
+
+func update(dt):
+    vx = 0
+    if action_down("left"):
+        vx = -230
+    if action_down("right"):
+        vx = 230
+    if action_pressed("jump") and on_ground:
+        vy = -520
+        on_ground = false
+        particles_emit(px + pw / 2, py + ph, 10, 80, 0.3, 2, color="#93c5fd", gravity=200)
+
+    vy = vy + 1500 * dt
+    px = px + vx * dt
+    py = py + vy * dt
+    if px < 0:
+        px = 0
+    if px > 880:
+        px = 880
+
+    on_ground = false
+    for p in platforms:
+        if px + pw > p[0] and px < p[0] + p[2] and vy >= 0:
+            old_bottom = py - vy * dt + ph
+            if old_bottom <= p[1] + 4 and py + ph >= p[1]:
+                py = p[1] - ph
+                vy = 0
+                on_ground = true
+
+    if py > 560:
+        deaths = deaths + 1
+        reset_player()
+
+    for i in range(len(coins)):
+        if not coins[i][2]:
+            if aabb(px, py, pw, ph, coins[i][0], coins[i][1], 16, 16):
+                coins[i][2] = true
+                score = score + 10
+                particles_emit(coins[i][0] + 8, coins[i][1] + 8, 14, 110, 0.5, 2, color="#facc15", gravity=120)
+
+    cam_x = px - 260
+    camera(cam_x, 0, 1)
+    camera_bounds(0, 0, 1000, 400)
+
+    particles_update(dt)
+    c.batch_begin()
+    c.clear()
+    c.circle(120, 80, 40, color="#1e293b", fill=true, screen=true)
+    for p in platforms:
+        c.rect(p[0], p[1], p[2], p[3], color="#334155", fill=true)
+        c.rect(p[0], p[1], p[2], 4, color="#64748b", fill=true)
+    for co in coins:
+        if not co[2]:
+            c.circle(co[0] + 8, co[1] + 8, 7, color="#facc15", fill=true)
+    c.rect(px, py, pw, ph, color="#38bdf8", fill=true)
+    c.rect(px + 5, py + 7, 6, 6, color="#082f49", fill=true)
+    particles_draw(c)
+    c.text(16, 14, "得分 " + str(score) + "    失误 " + str(deaths), color="#e2e8f0", size=15, screen=true)
+    c.text(16, 34, "S 存档 / L 读档", color="#94a3b8", size=11, screen=true)
+    c.batch_end()
+
+on win.close:
+    quit()
+
+on win.keydown:
+    if win.key == "s":
+        save_json("platformer_save.json", {"x": px, "y": py, "score": score, "deaths": deaths, "coins": coins})
+    if win.key == "l":
+        data = load_json("platformer_save.json", null)
+        if data != null:
+            px = data["x"]
+            py = data["y"]
+            score = data["score"]
+            deaths = data["deaths"]
+            coins = data["coins"]
+
+game_loop(update, fps=60)

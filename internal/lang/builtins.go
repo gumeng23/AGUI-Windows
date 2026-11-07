@@ -1,6 +1,7 @@
 package lang
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/rand"
@@ -124,10 +125,69 @@ func registerBuiltins(i *Interp) {
 			return float64(len([]rune(v))), nil
 		case *List:
 			return float64(len(v.Items)), nil
+		case *Bytes:
+			return float64(len(v.Data)), nil
 		case *Map:
 			return float64(len(v.M)), nil
 		}
 		return nil, fmt.Errorf("len(): %s 没有长度", TypeName(args[0]))
+	})
+
+	reg("bytes", func(i *Interp, args []Value, kwargs map[string]Value) (Value, error) {
+		if len(args) == 0 {
+			return &Bytes{}, nil
+		}
+		if len(args) > 1 {
+			return nil, fmt.Errorf("bytes(值) 最多接受 1 个参数")
+		}
+		data, err := valueBytes("bytes", args[0])
+		if err != nil {
+			return nil, err
+		}
+		return &Bytes{Data: data}, nil
+	})
+	reg("to_bytes", func(i *Interp, args []Value, kwargs map[string]Value) (Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("to_bytes(值) 需要一个参数")
+		}
+		data, err := valueBytes("to_bytes", args[0])
+		if err != nil {
+			return nil, err
+		}
+		return &Bytes{Data: data}, nil
+	})
+	reg("bytes_to_string", func(i *Interp, args []Value, kwargs map[string]Value) (Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("bytes_to_string(值) 需要一个参数")
+		}
+		switch v := args[0].(type) {
+		case *Bytes:
+			return string(v.Data), nil
+		case string:
+			return v, nil
+		}
+		return nil, fmt.Errorf("bytes_to_string(): 需要 bytes 或字符串，收到 %s", TypeName(args[0]))
+	})
+	reg("hex_encode", func(i *Interp, args []Value, kwargs map[string]Value) (Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("hex_encode(值) 需要一个参数")
+		}
+		data, err := valueBytes("hex_encode", args[0])
+		if err != nil {
+			return nil, err
+		}
+		return hex.EncodeToString(data), nil
+	})
+	reg("hex_decode", func(i *Interp, args []Value, kwargs map[string]Value) (Value, error) {
+		s, err := oneString("hex_decode", args)
+		if err != nil {
+			return nil, err
+		}
+		data, decErr := hex.DecodeString(strings.TrimSpace(s))
+		if decErr != nil {
+			return nil, fmt.Errorf("hex_decode(): %v", decErr)
+		}
+		return &Bytes{Data: data}, nil
 	})
 
 	reg("range", func(i *Interp, args []Value, kwargs map[string]Value) (Value, error) {
@@ -674,6 +734,67 @@ func registerBuiltins(i *Interp) {
 		}
 		return nil, nil
 	})
+	reg("read_bytes", func(i *Interp, args []Value, kwargs map[string]Value) (Value, error) {
+		path, err := oneString("read_bytes", args)
+		if err != nil {
+			return nil, err
+		}
+		var data []byte
+		err = i.Blocking(func() error {
+			var readErr error
+			data, readErr = i.ReadFile(path)
+			return readErr
+		})
+		if err != nil {
+			return nil, fmt.Errorf("read_bytes(): %v", err)
+		}
+		return &Bytes{Data: data}, nil
+	})
+	reg("write_bytes", func(i *Interp, args []Value, kwargs map[string]Value) (Value, error) {
+		if len(args) != 2 {
+			return nil, fmt.Errorf("write_bytes(路径, 数据) 需要两个参数")
+		}
+		path, ok := asString(args[0])
+		if !ok {
+			return nil, fmt.Errorf("write_bytes(): 路径必须是字符串")
+		}
+		data, err := valueBytes("write_bytes", args[1])
+		if err != nil {
+			return nil, err
+		}
+		path = i.ResolvePath(path)
+		if err := i.Blocking(func() error { return os.WriteFile(path, data, 0o644) }); err != nil {
+			return nil, fmt.Errorf("write_bytes(): %v", err)
+		}
+		return nil, nil
+	})
+	reg("append_bytes", func(i *Interp, args []Value, kwargs map[string]Value) (Value, error) {
+		if len(args) != 2 {
+			return nil, fmt.Errorf("append_bytes(路径, 数据) 需要两个参数")
+		}
+		path, ok := asString(args[0])
+		if !ok {
+			return nil, fmt.Errorf("append_bytes(): 路径必须是字符串")
+		}
+		data, err := valueBytes("append_bytes", args[1])
+		if err != nil {
+			return nil, err
+		}
+		path = i.ResolvePath(path)
+		err = i.Blocking(func() error {
+			f, openErr := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+			if openErr != nil {
+				return openErr
+			}
+			defer f.Close()
+			_, writeErr := f.Write(data)
+			return writeErr
+		})
+		if err != nil {
+			return nil, fmt.Errorf("append_bytes(): %v", err)
+		}
+		return nil, nil
+	})
 	reg("append_file", func(i *Interp, args []Value, kwargs map[string]Value) (Value, error) {
 		if len(args) != 2 {
 			return nil, fmt.Errorf("append_file(路径, 内容) 需要两个参数")
@@ -809,6 +930,34 @@ func registerBuiltins(i *Interp) {
 		}
 		return dir, nil
 	})
+}
+
+func valueBytes(name string, v Value) ([]byte, error) {
+	switch x := v.(type) {
+	case nil:
+		return nil, nil
+	case *Bytes:
+		return append([]byte(nil), x.Data...), nil
+	case string:
+		return []byte(x), nil
+	case float64:
+		n, ok := asInt(x)
+		if !ok || n < 0 || n > 255 {
+			return nil, fmt.Errorf("%s(): 数字必须是 0 到 255 的字节", name)
+		}
+		return []byte{byte(n)}, nil
+	case *List:
+		out := make([]byte, len(x.Items))
+		for idx, item := range x.Items {
+			n, ok := asInt(item)
+			if !ok || n < 0 || n > 255 {
+				return nil, fmt.Errorf("%s(): 列表元素必须是 0 到 255 的整数", name)
+			}
+			out[idx] = byte(n)
+		}
+		return out, nil
+	}
+	return nil, fmt.Errorf("%s(): 不能把 %s 转成 bytes", name, TypeName(v))
 }
 
 func oneString(name string, args []Value) (string, error) {

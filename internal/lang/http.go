@@ -99,9 +99,10 @@ func registerHTTP(i *Interp) {
 		if ok, _ := m.Get("ok"); !Truthy(ok) {
 			return m, nil
 		}
-		body, _ := m.Get("body")
-		data, _ := asString(body)
-		if err := i.Blocking(func() error { return os.WriteFile(path, []byte(data), 0o644) }); err != nil {
+		body, _ := m.Get("body_bytes")
+		data, _ := valueBytes("http_download", body)
+		path = i.ResolvePath(path)
+		if err := i.Blocking(func() error { return os.WriteFile(path, data, 0o644) }); err != nil {
 			return nil, fmt.Errorf("http_download: %v", err)
 		}
 		m.Set("path", path)
@@ -248,6 +249,7 @@ func httpDo(i *Interp, method string, urlVal Value, body Value, kwargs map[strin
 	out.Set("status", float64(status))
 	out.Set("ok", status >= 200 && status < 300)
 	out.Set("body", string(data))
+	out.Set("body_bytes", &Bytes{Data: append([]byte(nil), data...)})
 	h := NewMap()
 	for k, vals := range header {
 		h.Set(k, strings.Join(vals, ", "))

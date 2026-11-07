@@ -1,0 +1,111 @@
+#target android
+#name 星野养成
+#package com.agui.star
+#version 0.1.0
+#icon ../assets/agui.png
+
+win = window("星野养成")
+
+title = label("星野养成", size=26, fg="#9A3412")
+subtitle = label("第 1 天 · 今天还有 3 次行动", size=14, fg="#78716C")
+
+energy_bar = progress(value=70, max=100)
+mood_bar = progress(value=70, max=100)
+study_bar = progress(value=10, max=100)
+bond_bar = progress(value=0, max=100)
+
+status = label("体力 70  心情 70  学识 10  羁绊 0", size=14, fg="#44403C")
+
+rest_btn = button("休息")
+study_btn = button("学习")
+play_btn = button("玩耍")
+talk_btn = button("聊天")
+save_btn = button("保存")
+quit_btn = button("退出")
+
+log_label = label("今天也要好好照顾她。", size=13, fg="#57534E")
+
+day = 1
+turn = 0
+energy = 70
+mood = 70
+study = 10
+bond = 0
+
+func clamp100(v):
+    if v < 0:
+        return 0
+    if v > 100:
+        return 100
+    return v
+
+func refresh():
+    subtitle.text = "第 " + str(day) + " 天 · 今天还有 " + str(3 - turn) + " 次行动"
+    status.text = "体力 " + str(energy) + "  心情 " + str(mood) + "  学识 " + str(study) + "  羁绊 " + str(bond)
+    energy_bar.value = energy
+    mood_bar.value = mood
+    study_bar.value = study
+    bond_bar.value = bond
+    rest_btn.enabled = turn < 3
+    study_btn.enabled = turn < 3
+    play_btn.enabled = turn < 3
+    talk_btn.enabled = turn < 3
+
+func log(text):
+    log_label.text = "第 " + str(day) + " 天 · " + text
+
+func next_day():
+    if turn < 3:
+        return
+    turn = 0
+    day = day + 1
+    energy = clamp100(energy + 12)
+    mood = clamp100(mood + 4)
+    log("新的一天开始了。")
+    refresh()
+
+func act(kind):
+    if turn >= 3:
+        log("今天已经累了，休息吧。")
+        return
+    turn = turn + 1
+    if kind == "rest":
+        energy = clamp100(energy + 18)
+        mood = clamp100(mood + 6)
+        log("睡了个好觉，体力恢复了。")
+    if kind == "study":
+        study = clamp100(study + 8)
+        energy = clamp100(energy - 12)
+        mood = clamp100(mood - 3)
+        log("认真读了一下午书。")
+    if kind == "play":
+        mood = clamp100(mood + 14)
+        energy = clamp100(energy - 8)
+        bond = clamp100(bond + 5)
+        log("在公园里玩得很开心。")
+    if kind == "talk":
+        bond = clamp100(bond + 9)
+        mood = clamp100(mood + 4)
+        log("聊了很久，彼此更熟悉了。")
+    refresh()
+    next_day()
+
+on rest_btn.click:
+    act("rest")
+
+on study_btn.click:
+    act("study")
+
+on play_btn.click:
+    act("play")
+
+on talk_btn.click:
+    act("talk")
+
+on save_btn.click:
+    toast("进度保存在本机，下次继续。")
+
+on quit_btn.click:
+    quit()
+
+refresh()

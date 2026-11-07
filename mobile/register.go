@@ -1,0 +1,275 @@
+package mobile
+
+import (
+	"fmt"
+	"strings"
+
+	"agui/internal/lang"
+)
+
+// registerUI installs the portable Android View subset. Desktop-only controls
+// are deliberately absent so a script fails at build time instead of silently
+// doing nothing on Android.
+func registerUI(i *lang.Interp, a *App) {
+	reg := func(name string, fn func(*lang.Interp, []lang.Value, map[string]lang.Value) (lang.Value, error)) {
+		i.RegisterNative(name, fn)
+	}
+
+	reg("window", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("window", args, 0, 1); err != nil {
+			return nil, err
+		}
+		title := "Agui"
+		if len(args) > 0 {
+			title = lang.ToString(args[0])
+		}
+		w := a.addWidget(0, "window", title, 16, kwString(kw, "fg", "#111827"))
+		applyKw(a, w, kw)
+		return w, nil
+	})
+
+	reg("panel", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("panel", args, 0, 0); err != nil {
+			return nil, err
+		}
+		parent := parentID(kw)
+		w := a.addWidget(parent, "panel", "", 16, "")
+		applyKw(a, w, kw)
+		return w, nil
+	})
+
+	reg("label", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("label", args, 0, 1); err != nil {
+			return nil, err
+		}
+		w := a.addWidget(parentID(kw), "label", textArg(args), int(kwNumber(kw, "size", 16)), kwString(kw, "fg", "#111827"))
+		applyKw(a, w, kw)
+		return w, nil
+	})
+
+	reg("button", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("button", args, 0, 1); err != nil {
+			return nil, err
+		}
+		w := a.addWidget(parentID(kw), "button", textArg(args), int(kwNumber(kw, "size", 16)), kwString(kw, "fg", "#FFFFFF"))
+		applyKw(a, w, kw)
+		return w, nil
+	})
+
+	reg("edit", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("edit", args, 0, 1); err != nil {
+			return nil, err
+		}
+		w := a.addWidget(parentID(kw), "edit", textArg(args), int(kwNumber(kw, "size", 16)), "")
+		w.value = 0
+		a.bridge.SetText(w.id, w.text)
+		applyKw(a, w, kw)
+		return w, nil
+	})
+
+	reg("checkbox", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("checkbox", args, 0, 1); err != nil {
+			return nil, err
+		}
+		w := a.addWidget(parentID(kw), "checkbox", textArg(args), int(kwNumber(kw, "size", 16)), "")
+		w.checked = kwBool(kw, "checked", false)
+		a.bridge.SetChecked(w.id, w.checked)
+		applyKw(a, w, kw)
+		return w, nil
+	})
+
+	reg("progress", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("progress", args, 0, 1); err != nil {
+			return nil, err
+		}
+		w := a.addWidget(parentID(kw), "progress", "", 16, "")
+		w.max = kwNumber(kw, "max", 100)
+		w.value = kwNumber(kw, "value", 0)
+		if len(args) > 0 {
+			w.value = number(args[0])
+		}
+		a.bridge.SetProgress(w.id, int(w.value), int(w.max))
+		applyKw(a, w, kw)
+		return w, nil
+	})
+
+	reg("image", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("image", args, 0, 1); err != nil {
+			return nil, err
+		}
+		w := a.addWidget(parentID(kw), "image", "", 16, "")
+		w.src = textArg(args)
+		if w.src == "" {
+			w.src = kwString(kw, "src", "")
+		}
+		a.bridge.SetImage(w.id, w.src)
+		applyKw(a, w, kw)
+		return w, nil
+	})
+
+	reg("canvas", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("canvas", args, 0, 0); err != nil {
+			return nil, err
+		}
+		w := a.addWidget(parentID(kw), "canvas", "", 16, kwString(kw, "bg", "#0f172a"))
+		applyKw(a, w, kw)
+		w.refreshCanvas()
+		return w, nil
+	})
+
+	reg("font", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		m := lang.NewMap()
+		family := "sans-serif"
+		if len(args) > 0 {
+			family = lang.ToString(args[0])
+		}
+		size := kwNumber(kw, "size", 16)
+		m.Set("family", family)
+		m.Set("size", size)
+		m.Set("bold", kwBool(kw, "bold", false))
+		m.Set("italic", kwBool(kw, "italic", false))
+		return m, nil
+	})
+
+	reg("toast", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("toast", args, 1, 1); err != nil {
+			return nil, err
+		}
+		a.bridge.Toast(lang.ToString(args[0]))
+		return nil, nil
+	})
+
+	reg("after", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("after", args, 2, 2); err != nil {
+			return nil, err
+		}
+		id := a.timer(int(number(args[0])), false, args[1])
+		return float64(id), nil
+	})
+
+	reg("every", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("every", args, 2, 2); err != nil {
+			return nil, err
+		}
+		id := a.timer(int(number(args[0])), true, args[1])
+		return float64(id), nil
+	})
+
+	reg("cancel_timer", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("cancel_timer", args, 1, 1); err != nil {
+			return nil, err
+		}
+		a.cancelTimer(int(number(args[0])))
+		return nil, nil
+	})
+
+	reg("quit", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		a.finish()
+		return nil, nil
+	})
+
+	reg("platform", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		return "android", nil
+	})
+
+	reg("dpi", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		return float64(2), nil
+	})
+
+	reg("clipboard", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		return "", nil
+	})
+
+	reg("set_clipboard", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		return nil, nil
+	})
+
+	reg("open_url", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		a.bridge.Toast("此版本不支持打开链接")
+		return nil, nil
+	})
+
+	reg("share", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("share", args, 1, 1); err != nil {
+			return nil, err
+		}
+		a.bridge.Share(lang.ToString(args[0]))
+		return nil, nil
+	})
+
+	reg("pick_file", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("pick_file", args, 0, 1); err != nil {
+			return nil, err
+		}
+		mime := "*/*"
+		if len(args) > 0 {
+			mime = lang.ToString(args[0])
+		}
+		a.bridge.PickFile(mime)
+		return nil, nil
+	})
+
+	reg("request_permission", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("request_permission", args, 1, 1); err != nil {
+			return nil, err
+		}
+		name := lang.ToString(args[0])
+		if !strings.HasPrefix(name, "android.permission.") {
+			return nil, fmt.Errorf("权限名必须以 android.permission. 开头")
+		}
+		a.bridge.RequestPermission(name)
+		return nil, nil
+	})
+
+	a.registerGame()
+}
+
+func applyKw(a *App, w *Widget, kw map[string]lang.Value) {
+	if v, ok := kw["visible"]; ok {
+		w.visible = lang.Truthy(v)
+		a.bridge.SetVisible(w.id, w.visible)
+	}
+	if v, ok := kw["enabled"]; ok {
+		w.enabled = lang.Truthy(v)
+		a.bridge.SetEnabled(w.id, w.enabled)
+	}
+	if v, ok := kw["fg"]; ok {
+		w.fg = lang.ToString(v)
+		a.bridge.SetStyle(w.id, w.fg, w.size)
+	}
+	if v, ok := kw["size"]; ok {
+		w.size = int(number(v))
+		a.bridge.SetStyle(w.id, w.fg, w.size)
+	}
+	if v, ok := kw["font"]; ok {
+		if m, ok := v.(*lang.Map); ok {
+			if f, ok := m.Get("size"); ok {
+				w.size = int(number(f))
+				a.bridge.SetStyle(w.id, w.fg, w.size)
+			}
+		}
+	}
+	if v, ok := kw["checked"]; ok && w.kind == "checkbox" {
+		w.checked = lang.Truthy(v)
+		a.bridge.SetChecked(w.id, w.checked)
+	}
+	if v, ok := kw["max"]; ok && w.kind == "progress" {
+		w.max = number(v)
+		a.bridge.SetProgress(w.id, int(w.value), int(w.max))
+	}
+	if v, ok := kw["value"]; ok && w.kind == "progress" {
+		w.value = number(v)
+		a.bridge.SetProgress(w.id, int(w.value), int(w.max))
+	}
+}
+
+func parentID(kw map[string]lang.Value) int {
+	if v, ok := kw["parent"]; ok {
+		if w, ok := v.(*Widget); ok {
+			return w.id
+		}
+	}
+	return 1
+}
+
+var _ = fmt.Sprintf

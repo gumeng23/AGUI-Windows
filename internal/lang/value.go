@@ -3,6 +3,7 @@
 package lang
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"strconv"
@@ -12,8 +13,25 @@ import (
 )
 
 // Value is any Agui runtime value: null, bool, float64, string, *List, *Map,
-// *Function, *Native, a GUI widget or a GUI font.
+// *Bytes, *Function, *Native, a GUI widget or a GUI font.
 type Value any
+
+// Bytes is a mutable byte buffer used for binary files, images and
+// WebSocket/HTTP payloads.
+type Bytes struct {
+	Data []byte
+}
+
+// NewBytes copies b into a new Bytes value.
+func NewBytes(b []byte) *Bytes {
+	return &Bytes{Data: append([]byte(nil), b...)}
+}
+
+// Len returns the number of bytes.
+func (b *Bytes) Len() int { return len(b.Data) }
+
+// Describe implements Describer.
+func (b *Bytes) Describe() string { return fmt.Sprintf("<bytes %d>", len(b.Data)) }
 
 // List is a mutable Agui list.
 type List struct {
@@ -138,6 +156,8 @@ func Truthy(v Value) bool {
 		return x != ""
 	case *List:
 		return len(x.Items) > 0
+	case *Bytes:
+		return len(x.Data) > 0
 	case *Map:
 		return len(x.M) > 0
 	default:
@@ -170,6 +190,9 @@ func Equal(a, b Value) bool {
 			}
 		}
 		return true
+	case *Bytes:
+		y, ok := b.(*Bytes)
+		return ok && bytes.Equal(x.Data, y.Data)
 	case *Map:
 		y, ok := b.(*Map)
 		if !ok || len(x.M) != len(y.M) {
@@ -200,6 +223,8 @@ func TypeName(v Value) string {
 		return "string"
 	case *List:
 		return "list"
+	case *Bytes:
+		return "bytes"
 	case *Map:
 		return "map"
 	case *Class:
@@ -210,9 +235,14 @@ func TypeName(v Value) string {
 		return "task"
 	case *WebSocket:
 		return "websocket"
+	case *SQLite:
+		return "sqlite"
 	case *Function, *Native:
 		return "function"
 	default:
+		if n, ok := v.(interface{ TypeName() string }); ok {
+			return n.TypeName()
+		}
 		if _, ok := v.(Widget); ok {
 			return "widget"
 		}
@@ -258,6 +288,8 @@ func ToString(v Value) string {
 			parts[idx] = repr(item)
 		}
 		return "[" + strings.Join(parts, ", ") + "]"
+	case *Bytes:
+		return string(x.Data)
 	case *Map:
 		parts := make([]string, 0, len(x.Keys))
 		for _, k := range x.Keys {
@@ -289,6 +321,9 @@ func ToString(v Value) string {
 func repr(v Value) string {
 	if s, ok := v.(string); ok {
 		return strconv.QuoteToASCII(s)
+	}
+	if b, ok := v.(*Bytes); ok {
+		return b.Describe()
 	}
 	return ToString(v)
 }

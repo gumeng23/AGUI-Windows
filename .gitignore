@@ -15,3 +15,21 @@
 
 # 示例运行时生成的数据
 /todo.txt
+
+# 源码归档与本地测试应用
+/aguicode.zip
+/app-usingthis/
+/out/
+/.agui-android-*/
+
+# 编译器/打包生成的二进制
+/android/runtime/*.aar
+/android/runtime/*.jar
+/android/runtime/*.keystore
+/android/app/
+/web/agui.wasm
+
+# VS Code 扩展依赖与打包产物
+/vscode-agui/node_modules/
+/vscode-agui/out/
+/vscode-agui/*.vsix

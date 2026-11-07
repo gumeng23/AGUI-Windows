@@ -1,0 +1,7 @@
+t = tray(icon="../assets/app.ico", tooltip="Agui 托盘示例")
+print("tray visible", t.visible, "added", t.added, "error", t.last_error)
+t.item("打开", lambda: msgbox("从托盘打开"))
+t.item("退出", lambda: quit())
+if t.visible:
+    t.notify("Agui", "托盘示例已启动")
+after(3000, quit)

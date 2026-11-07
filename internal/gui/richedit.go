@@ -1,7 +1,13 @@
 package gui
 
 import (
+	"bytes"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"image/jpeg"
+	"image/png"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -82,6 +88,7 @@ func (a *App) createRichEdit(text string, readonly bool, x, y, w, h *int32) (*Wi
 	if err != nil {
 		return nil, err
 	}
+	sendMessage(widget.hwnd, emSetEventMask, enmLink, 0)
 	return widget, nil
 }
 
@@ -239,4 +246,229 @@ func (w *Widget) appendRich(text string, kwargs map[string]lang.Value) error {
 	}
 	sendMessage(w.hwnd, emSetSel, uintptr(end), uintptr(end))
 	return nil
+}
+
+type richLink struct {
+	start, end int32
+	url        string
+}
+
+type charRange struct {
+	cpMin, cpMax int32
+}
+
+type enLinkW struct {
+	nmhdr  nmhdr
+	msg    uint32
+	_      uint32
+	wParam uintptr
+	lParam uintptr
+	chrg   charRange
+}
+
+type editStreamW struct {
+	dwCookie    uintptr
+	dwError     uint32
+	pfnCallback uintptr
+}
+
+type editStreamCookie struct {
+	data []byte
+	pos  int
+}
+
+func editStreamCallback(cookie uintptr, pbBuff uintptr, cb uintptr, pcb uintptr) uintptr {
+	c := (*editStreamCookie)(unsafe.Pointer(cookie))
+	n := 0
+	if c.pos < len(c.data) {
+		dst := unsafe.Slice((*byte)(unsafe.Pointer(pbBuff)), int(cb))
+		n = copy(dst, c.data[c.pos:])
+		c.pos += n
+	}
+	*(*int32)(unsafe.Pointer(pcb)) = int32(n)
+	return 0
+}
+
+var editStreamCallbackPtr = syscall.NewCallback(editStreamCallback)
+
+func (w *Widget) richSelection() (int32, int32) {
+	r := sendMessage(w.hwnd, emGetSel, 0, 0)
+	start := int32(r & 0xFFFF)
+	end := int32((r >> 16) & 0xFFFF)
+	if start < 0 || start > 0x7FFFFFFF {
+		start = 0
+	}
+	if end < start {
+		end = start
+	}
+	return start, end
+}
+
+func (w *Widget) richSelectRange(start, end int32) {
+	if start < 0 {
+		start = 0
+	}
+	if end < start {
+		end = start
+	}
+	sendMessage(w.hwnd, emSetSel, uintptr(start), uintptr(end))
+	sendMessage(w.hwnd, emScrollCaret, 0, 0)
+}
+
+func (w *Widget) richSelectedText() string {
+	start, end := w.richSelection()
+	txt := getWindowText(w.hwnd)
+	runes := []rune(txt)
+	if int(end) > len(runes) {
+		end = int32(len(runes))
+	}
+	if int(start) >= len(runes) || start >= end {
+		return ""
+	}
+	return string(runes[start:end])
+}
+
+func (w *Widget) richInsertText(text string, replace bool) {
+	if replace {
+		sendMessage(w.hwnd, emReplaceSel, 1, uintptr(unsafe.Pointer(u16(text))))
+		return
+	}
+	start, _ := w.richSelection()
+	sendMessage(w.hwnd, emSetSel, uintptr(start), uintptr(start))
+	sendMessage(w.hwnd, emReplaceSel, 1, uintptr(unsafe.Pointer(u16(text))))
+}
+
+func (w *Widget) richLink(text, url string) error {
+	start, _ := w.richSelection()
+	w.richInsertText(text, true)
+	end := w.textLen()
+	if end <= start {
+		return fmt.Errorf("插入链接文字失败")
+	}
+	cf := charFormat2W{
+		cbSize:      uint32(unsafe.Sizeof(charFormat2W{})),
+		dwMask:      cfmLink | cfmColor | cfmUnderline,
+		dwEffects:   cfeLink | cfeUnderline,
+		crTextColor: 0x00FF0000, // COLORREF: blue
+	}
+	sendMessage(w.hwnd, emSetSel, uintptr(start), uintptr(end))
+	sendMessage(w.hwnd, emSetCharFormat, scfSelection, uintptr(unsafe.Pointer(&cf)))
+	w.richLinks = append(w.richLinks, richLink{start: start, end: end, url: url})
+	sendMessage(w.hwnd, emSetSel, uintptr(end), uintptr(end))
+	return nil
+}
+
+func (w *Widget) richInsertImage(v lang.Value) error {
+	var data []byte
+	switch t := v.(type) {
+	case *lang.Bytes:
+		data = t.Data
+	case string:
+		b, err := w.app.interp.ReadFile(t)
+		if err != nil {
+			return err
+		}
+		data = b
+	default:
+		return fmt.Errorf("insert_image 需要 bytes 或图片路径")
+	}
+	if len(data) < 24 || string(data[1:4]) != "PNG" {
+		return fmt.Errorf("只支持 PNG 图片")
+	}
+	wpx := binary.BigEndian.Uint32(data[16:20])
+	hpx := binary.BigEndian.Uint32(data[20:24])
+	if wpx == 0 || hpx == 0 || wpx > 20000 || hpx > 20000 {
+		return fmt.Errorf("PNG 尺寸无效")
+	}
+	img, err := png.Decode(bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("解码 PNG 失败：%v", err)
+	}
+	var jb bytes.Buffer
+	if err := jpeg.Encode(&jb, img, &jpeg.Options{Quality: 90}); err != nil {
+		return err
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, `{tf1nsi\deff0{\pict\jpegblip\picw%d\pich%d\picwgoal%d\pichgoal%d `,
+		wpx, hpx, wpx*15, hpx*15)
+	b.WriteString(hex.EncodeToString(jb.Bytes()))
+	b.WriteString(`}}`)
+	if err := clipboardSetRTF(b.String()); err != nil {
+		return err
+	}
+	selStart, _ := w.richSelection()
+	setFocus(w.hwnd)
+	before := w.textLen()
+	sendMessage(w.hwnd, wmPaste, 0, 0)
+	after := w.textLen()
+	if after <= before {
+		return fmt.Errorf("插入图片失败")
+	}
+	sendMessage(w.hwnd, emSetSel, uintptr(after), uintptr(after))
+	for i := range w.richLinks {
+		if w.richLinks[i].start >= selStart {
+			w.richLinks[i].start++
+			w.richLinks[i].end++
+		}
+	}
+	return nil
+}
+
+func (w *Widget) richNotify(code uint32, lparam uintptr) {
+	if code != enLink {
+		return
+	}
+	el := (*enLinkW)(unsafe.Pointer(lparam))
+	if el.msg != wmLButtonUp {
+		return
+	}
+	pos := el.chrg.cpMin
+	for _, l := range w.richLinks {
+		if pos >= l.start && pos < l.end {
+			openURL(l.url)
+			return
+		}
+	}
+}
+
+func clipboardRTFFormat() uint32 {
+	name := u16("Rich Text Format")
+	r, _, _ := pRegisterClipboardFormatW.Call(uintptr(unsafe.Pointer(name)))
+	return uint32(r)
+}
+
+func clipboardSetRTF(rtf string) error {
+	cf := clipboardRTFFormat()
+	if cf == 0 {
+		return fmt.Errorf("无法注册 RTF 剪贴板格式")
+	}
+	h := globalAlloc(gmemMoveable, uintptr(len(rtf)+1))
+	if h == 0 {
+		return fmt.Errorf("剪贴板内存分配失败")
+	}
+	ptr, _, _ := pGlobalLock.Call(uintptr(h))
+	if ptr == 0 {
+		pGlobalFree.Call(uintptr(h))
+		return fmt.Errorf("剪贴板内存锁定失败")
+	}
+	dst := unsafe.Slice((*byte)(unsafe.Pointer(ptr)), len(rtf)+1)
+	copy(dst, rtf)
+	pGlobalUnlock.Call(uintptr(h))
+	if r, _, _ := pOpenClipboard.Call(0); r == 0 {
+		pGlobalFree.Call(uintptr(h))
+		return fmt.Errorf("无法打开剪贴板")
+	}
+	defer pCloseClipboard.Call()
+	pEmptyClipboard.Call()
+	if r, _, _ := pSetClipboardData.Call(uintptr(cf), uintptr(h)); r == 0 {
+		pGlobalFree.Call(uintptr(h))
+		return fmt.Errorf("写入 RTF 剪贴板失败")
+	}
+	return nil
+}
+
+func openURL(url string) {
+	op := u16("open")
+	target := u16(url)
+	pShellExecuteW.Call(0, uintptr(unsafe.Pointer(op)), uintptr(unsafe.Pointer(target)), 0, 0, 1)
 }

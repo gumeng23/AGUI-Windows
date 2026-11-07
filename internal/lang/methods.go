@@ -1,6 +1,7 @@
 package lang
 
 import (
+	"encoding/hex"
 	"sort"
 	"strings"
 )
@@ -34,12 +35,81 @@ func (i *Interp) callMethod(obj Value, name string, args []Value, kwargs map[str
 	switch o := obj.(type) {
 	case *List:
 		return i.listMethod(o, name, args)
+	case *Bytes:
+		return i.bytesMethod(o, name, args)
 	case string:
 		return i.stringMethod(o, name, args)
 	case *Map:
 		return i.mapMethod(o, name, args)
 	}
 	i.throw("%s 没有方法 %q", TypeName(obj), name)
+	return nil
+}
+
+func (i *Interp) bytesMethod(b *Bytes, name string, args []Value) Value {
+	switch name {
+	case "len":
+		return float64(len(b.Data))
+	case "push", "append":
+		if len(args) == 0 {
+			i.throw("push() 需要至少一个参数")
+		}
+		for _, v := range args {
+			n, ok := asInt(v)
+			if !ok || n < 0 || n > 255 {
+				i.throw("bytes.push() 只接受 0 到 255 的整数")
+			}
+			b.Data = append(b.Data, byte(n))
+		}
+		return b
+	case "pop":
+		if len(b.Data) == 0 {
+			i.throw("pop() 不能对空 bytes 使用")
+		}
+		v := b.Data[len(b.Data)-1]
+		b.Data = b.Data[:len(b.Data)-1]
+		return float64(v)
+	case "clear":
+		b.Data = nil
+		return nil
+	case "slice":
+		start, end := 0, len(b.Data)
+		if len(args) > 0 {
+			n, ok := asInt(args[0])
+			if !ok {
+				i.throw("slice() 的下标必须是整数")
+			}
+			start = n
+		}
+		if len(args) > 1 {
+			n, ok := asInt(args[1])
+			if !ok {
+				i.throw("slice() 的下标必须是整数")
+			}
+			end = n
+		}
+		if start < 0 {
+			start += len(b.Data)
+		}
+		if end < 0 {
+			end += len(b.Data)
+		}
+		if start < 0 {
+			start = 0
+		}
+		if end > len(b.Data) {
+			end = len(b.Data)
+		}
+		if start > end {
+			start = end
+		}
+		return &Bytes{Data: append([]byte(nil), b.Data[start:end]...)}
+	case "to_string", "string":
+		return string(b.Data)
+	case "hex":
+		return hex.EncodeToString(b.Data)
+	}
+	i.throw("bytes 没有方法 %q", name)
 	return nil
 }
 

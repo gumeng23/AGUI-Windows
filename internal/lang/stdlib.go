@@ -149,6 +149,7 @@ func registerStdlib(i *Interp) {
 		return doHTTP(i, strings.ToUpper(method), args[1], body, kwargs)
 	})
 	registerHTTP(i)
+	registerSQLite(i)
 }
 
 func stdBool(kwargs map[string]Value, name string, def bool) bool {
@@ -285,6 +286,34 @@ func toJSONValue(v Value, depth int) (any, error) {
 	default:
 		return nil, fmt.Errorf("json_encode: 不支持的类型 %s", TypeName(v))
 	}
+}
+
+// EncodeJSON converts an Agui value to JSON bytes. It is used by the GUI game
+// helpers (save_json) so both paths share exactly the same conversion rules.
+func EncodeJSON(v Value) ([]byte, error) {
+	x, err := toJSONValue(v, 0)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(x)
+}
+
+// DecodeJSON parses JSON bytes into Agui values.
+func DecodeJSON(data []byte) (Value, error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	var raw any
+	if err := dec.Decode(&raw); err != nil {
+		return nil, err
+	}
+	var extra any
+	if err := dec.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return nil, fmt.Errorf("JSON 后面还有多余内容")
+		}
+		return nil, err
+	}
+	return fromJSONValue(raw), nil
 }
 
 func fromJSONValue(v any) Value {

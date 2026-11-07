@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#f6efe6">
+  <title>星野养成 · Agui</title>
+  <link rel="icon" href="oc.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="app" class="agui-root">
+    <div class="boot" id="boot">
+      <div class="boot-orb"></div>
+      <p>正在唤醒星野…</p>
+    </div>
+  </main>
+
+  <div id="fatal" class="fatal">
+    <div class="fatal-card">
+      <h1>启动失败</h1>
+      <pre class="fatal-msg"></pre>
+      <p>请确认 WebView 支持 WebAssembly，并检查 game.ag。</p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="game-data.js"></script>
+  <script src="wasm_exec.js"></script>
+  <script>
+    window.aguiToast = function (text) {
+      const el = document.getElementById('toast');
+      el.textContent = text;
+      el.classList.add('show');
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+    };
+    window.addEventListener('error', function (e) {
+      const fatal = document.getElementById('fatal');
+      if (!fatal) return;
+      fatal.style.display = 'flex';
+      fatal.querySelector('.fatal-msg').textContent = e.message || String(e.error || e);
+    });
+    (async function () {
+      try {
+        if (!WebAssembly || !WebAssembly.instantiate) {
+          throw new Error('此 WebView 不支持 WebAssembly');
+        }
+        const go = new Go();
+        const bytes = await (await fetch('agui.wasm')).arrayBuffer();
+        const result = await WebAssembly.instantiate(bytes, go.importObject);
+        document.getElementById('boot')?.remove();
+        go.run(result.instance);
+      } catch (err) {
+        const fatal = document.getElementById('fatal');
+        fatal.style.display = 'flex';
+        fatal.querySelector('.fatal-msg').textContent = String(err && err.stack || err);
+      }
+    })();
+  </script>
+</body>
+</html>

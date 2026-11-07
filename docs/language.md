@@ -900,6 +900,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\sign.ps1 -Exe hello.
 
 它会创建/复用一个自签名代码签名证书并签名。自签名只能用于本地信任；SmartScreen 信誉需要可信证书和时间积累。详细步骤见 [signing.md](signing.md)。
 
+### 13.5 包管理
+
+```powershell
+agui install https://example.com/mathx.ag mathx
+agui install .\mypkg mathx
+agui list
+agui remove mathx
+```
+
+安装到项目根 `packages/`，元数据为 `packages/<name>.json`；`import "mathx"` 会自动在 `packages/` 中查找。详见 16.26。
+
 ---
 
 ## 14. 与 Python 的差异
@@ -909,7 +920,7 @@ Agui 借鉴了 Python 的缩进和部分语法，但不是 Python：
 - 有轻量 `class`，但没有继承、装饰器、生成器、列表推导式、类变量/静态方法。
 - 异常有 `try/catch/finally` 和 `raise`，没有 `else`；捕获变量是格式化后的错误文本，不是异常对象。
 - `lambda` 支持单表达式和多行块，但不能直接写在函数调用的圆括号参数里。
-- `import` 是文本级导入：在**当前作用域**执行另一个 `.ag` 文件，不是 Python 的模块对象；没有包、`as`、`from ... import`。
+- `import` 是文本级导入：在**当前作用域**执行另一个 `.ag` 文件，支持从 `packages/` 解析已安装包，但不是 Python 的模块对象；没有命名空间、`as`、`from ... import`。
 - 切片支持 `[lo:hi:step]`，包括负步长；没有多维切片。
 - 没有三元表达式；用 `if` 语句代替。
 - `and` / `or` 返回布尔值，而不是其中一个操作数。
@@ -929,13 +940,15 @@ Agui 借鉴了 Python 的缩进和部分语法，但不是 Python：
 - 多行 lambda 不能直接写在函数调用的圆括号里；先赋值再传。
 - `import` 的运行时错误仍显示主文件行号；错误消息包含导入文件路径，但没有独立源码映射。
 - 菜单支持两级子菜单、真实快捷键和图标；没有动态插入/删除整段菜单的重建 API。
-- 富文本支持追加和字符/段落格式，不支持内嵌图片、表格、超链接。
+- 富文本支持追加、字符/段落格式、选区、超链接和插图；插图通过 RTF/剪贴板完成，部分 RichEdit 版本的图片显示可能不稳定。
 - 表格支持编辑、排序和编辑事件，但没有虚拟化、多选、列宽拖拽保存、分组。
 - treeview 没有拖拽节点、多选；canvas 没有贝塞尔曲线、图片、路径填充。
 - 自绘按钮支持纯色背景/文字色，没有渐变、圆角和图标。
 - 布局容器支持纵向、网格、锚点和滚动，但没有百分比尺寸、flex 权重和自动换行的水平流式布局。
 - 异步任务是协作式的：CPU 密集脚本会在语句间让出，但单条不可中断的原生调用返回前无法响应取消。
 - `screenshot()` 默认截活动窗口，多窗口时需要传窗口对象。
+- SQLite 依赖 Windows 自带的 `winsqlite3.dll`；包管理器没有版本依赖求解。
+- 托盘依赖 Explorer；受限进程可能得到“拒绝访问”，此时 `tray.visible=false` 且 `last_error` 记录原因。
 - 自签名 exe 只能建立本机信任；SmartScreen 声誉需要正式证书和时间。
 
 ---
@@ -1080,9 +1093,14 @@ r.format(0, 2, bold=true, color="#DC2626")
 | `append(text, bold=, italic=, underline=, color=, size=, font=, align=)` | 在文末追加并格式化新文本 |
 | `format(start, end, ...)` | 格式化指定字符范围 |
 | `select_all()` / `clear()` | 全选 / 清空 |
+| `select_range(start, end)` / `selection()` | 选中范围 / 读取范围 |
+| `selected_text()` / `insert_text(text, replace=false)` | 读取选中文字 / 插入文字 |
+| `replace_selection(text)` / `scroll_caret()` | 替换选区 / 滚动到光标 |
+| `link(text, url)` / `insert_image(path_or_bytes, w=, h=)` | 插入超链接 / 图片 |
+| `selection_start` / `selection_end` / `link_count` | 选区起点、终点、链接数量 |
 | `text` / `readonly` / `fg` / `bg` | 文本、只读、文字色、背景色 |
 
-`align` 支持 `left` / `center` / `right`。事件：`change`、`click`。
+`align` 支持 `left` / `center` / `right`。事件：`change`、`click`。链接点击会打开系统浏览器；插图会覆盖系统剪贴板，详见 16.27。
 
 ### 16.8 表格
 
@@ -1429,3 +1447,384 @@ t.wait(5)
 - 属性：`url`、`protocol`、`connected`、`closed`、`message`、`type`、`count`、`last_error`。
 - 无窗口（命令行）脚本也能收到事件；GUI 脚本的事件回调会回到 UI 线程。
 - 服务端示例可用 `scripts/ws_echo.py`（依赖 Python websockets）或任意 echo 服务。
+
+### 16.23 bytes 字节数组
+
+`bytes` 是独立的二进制值类型，不会像字符串那样做编码转换；适合文件、网络、图片和 SQLite BLOB。
+
+```agui
+b = bytes("Agui")          # UTF-8 字节
+b = b + "!"                # bytes + 字符串
+print(len(b), b.hex())     # 5 4167756921
+print(b[0])                # 65
+print(b.slice(0, 2).to_string())
+b.push(33)
+write_bytes("demo.bin", b)
+c = read_bytes("demo.bin")
+print(c.to_string())
+```
+
+- 构造/转换：`bytes(x)`、`to_bytes(x)`、`bytes_to_string(b)`、`hex_encode(b)`、`hex_decode(s)`。
+- 文件：`read_bytes(path)`、`write_bytes(path, b)`、`append_bytes(path, b)`。
+- 方法：`len()`、`push(...)` / `append(...)`、`pop()`、`clear()`、`slice(start, end)`、`to_string()` / `string()`、`hex()`。
+- `bytes` 支持 `+`、`[]` 下标、切片（含步长）、`for` 遍历、`in`。
+- WebSocket 二进制帧和 HTTP 的 `body_bytes` 使用 `bytes`；`http_download` 写入原始字节。
+
+### 16.24 托盘、剪贴板图片与音频
+
+```agui
+t = tray(icon="assets/app.ico", tooltip="Agui")
+t.item("打开", lambda: msgbox("打开"))
+t.item("退出", lambda: quit())
+t.notify("Agui", "已启动")
+
+png = clipboard_image()       # bytes（PNG）
+if png != nil:
+    write_bytes("clip.png", png)
+
+play_wav("assets/beep.wav")   # 异步播放
+stop_wav()
+```
+
+- `tray(icon=, tooltip=)`：属性 `visible/added/last_error/tooltip/icon`；方法 `item/separator/notify/set_icon/set_tooltip/minimize_to_tray/remove/hide/show`；事件 `click/dblclick`。
+- 托盘依赖 Windows Explorer 的消息窗口；某些受限进程会得到“拒绝访问”，此时对象仍可用，`last_error` 记录原因，`visible=false`。
+- `clipboard_image()` 读取 CF_DIBV5/CF_DIB 并编码为 PNG；没有图片时返回 `nil`；支持 24/32 位未压缩和 32 位 BITFIELDS。
+- `play_wav(path, loop=false)`、`stop_wav()` 使用 winmm；只支持 WAV。
+
+### 16.25 SQLite
+
+Windows 10/11 自带 `winsqlite3.dll`，不需要额外安装。
+
+```agui
+db = sqlite_open(":memory:")
+db.exec("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, score REAL)")
+r = db.execute("INSERT INTO users(name, score) VALUES (?, ?)", "Alice", 9.5)
+print(r["last_id"], r["changes"])
+
+rows = db.query("SELECT id, name, score FROM users")
+for row in rows:
+    print(row["id"], row["name"], row["score"])
+
+print(db.tables)
+db.close()
+```
+
+- `sqlite_open(path, readonly=false, create=true)`；路径 `":memory:"` 为内存库。
+- `db.exec(sql)` 执行无返回语句，返回 changes；`db.execute(sql, ...)` 绑定参数并返回 `{changes, last_id}`；`db.query(sql, ...)` 返回 `List[Map]`。
+- 属性：`tables`、`last_error`、`path`、`closed`；方法：`exec/execute/query/close`。
+- 参数支持字符串、数字、bytes、nil；浮点通过文本绑定并依赖 SQLite 的 REAL affinity。
+- SQLite 调用是阻塞的；需要不卡 UI 时放进 `async`。
+
+### 16.26 包管理器
+
+```powershell
+agui install https://example.com/mathx.ag mathx
+agui install .\mypkg mathx
+agui list
+agui remove mathx
+```
+
+包安装在项目根的 `packages/` 下，元数据写入 `packages/<name>.json`。安装目录时，入口优先 `<name>.ag`、`<name>/<name>.ag`、`index.ag`、`main.ag`。
+
+```agui
+import "mathx"
+print(add(2, 3))
+```
+
+- 包是文本级包含：导入后定义直接进入当前环境，没有命名空间；推荐用唯一前缀避免冲突。
+- 支持 HTTP(S) 直接 `.ag` 文件（20MB 上限、60 秒超时）和本地文件/目录。
+- `list` 显示名称、版本和入口。
+
+### 16.27 RichEdit 选区、链接与图片
+
+```agui
+r = richedit("Agui", h=220)
+r.append(" 富文本", bold=true, color="#1D4ED8")
+r.link("官网", "https://example.com")
+r.insert_image("assets/agui.png", w=160, h=100)
+
+r.select_range(0, 4)
+print(r.selected_text)       # Agui
+print(r.selection_start, r.selection_end)
+print(r.link_count)
+```
+
+- 方法：`select_range(start, end)`、`selection()` 返回 `[start,end]`、`selected_text()`、`insert_text(text, replace=false)`、`replace_selection(text)`、`insert_image(path_or_bytes, w=, h=)`、`link(text, url)`、`scroll_caret()`。
+- 属性：`selection_start`、`selection_end`、`selected_text`、`link_count`、`selection`（可写 `[start,end]`）。
+- 链接点击用 `ShellExecuteW` 打开系统浏览器。
+- 图片通过“RTF + 剪贴板 + WM_PASTE”插入，会覆盖系统剪贴板；部分 RichEdit 版本对图片显示支持有限，建议插入后 `redraw()` 或重新聚焦。
+- 支持 PNG；内部转成 JPEG RTF，宽高按传入值缩放。
+
+### 16.28 Game Kit：2D 小游戏运行时
+
+Game Kit 是建立在窗口、canvas 和 Win32 定时器上的轻量 2D 运行时，不是完整引擎。
+它提供固定步长循环、键盘/手柄、相机、精灵、粒子、碰撞、音频、全屏和 JSON 存档。
+
+最小示例：
+
+```agui
+win = window("小游戏", 640, 480, bg="#0b1220")
+c = canvas(w=600, h=380, bg="#0f172a")
+
+px = 100
+py = 100
+
+func update(dt):
+    if key_down("right"):
+        px = px + 220 * dt
+    if key_down("left"):
+        px = px - 220 * dt
+    c.batch_begin()
+    c.clear()
+    c.circle(px, py, 18, color="#38bdf8", fill=true)
+    c.text(12, 12, "FPS " + str(round(1 / dt)), color="#e2e8f0", screen=true)
+    c.batch_end()
+
+game_loop(update, fps=60)
+```
+
+#### 16.28.1 循环与时间
+
+| API | 说明 |
+| --- | --- |
+| `game_loop(update, draw=null, fps=60)` | 启动固定步长循环。`update(dt)` 每步调用；`draw(alpha)` 每帧调用；`fps` 必须是关键字或第三个参数 |
+| `game_stop()` / `game_pause()` / `game_resume()` | 停止 / 暂停 / 恢复 |
+| `game_set_time_scale(v)` / `time_scale(v)` | 0 暂停时间，1 正常，2 加速 |
+| `game_running()` / `game_paused()` | 查询状态 |
+| `dt` / `game_time` / `game_frame` | 当前固定步长、累计游戏时间、帧号 |
+
+固定步长默认 1/60 秒；每帧最多补 8 步，避免卡顿后追帧过久。
+`update` 内不要做阻塞 IO；长任务用 `async` 或拆到多帧。
+
+#### 16.28.2 键盘、快捷键与手柄
+
+```agui
+bind("left", "a", "left")
+bind("jump", "space", "w", "up")
+
+if action_down("left"):
+    px = px - 200 * dt
+if action_pressed("jump"):
+    vy = -500
+```
+
+- `key_down(name)` / `key_pressed(name)` / `key_released(name)`：单键查询；
+- `bind(action, key1, key2, ...)` 与 `action_down/action_pressed`：动作映射；
+- `keys_down()`：当前按下的键列表；
+- 窗口事件：`on win.keydown:`、`on win.keyup:`，`win.key` 是按键名；
+- 常用键名：`a`..`z`、`0`..`9`、`space`、`enter`、`escape`、`left/right/up/down`、`shift/ctrl/alt`、`f1`..`f12`。
+- 手柄：`gamepad_connected()`、`gamepad_button("a")`、`gamepad_axis("left_x")`；支持 XInput 1.4/1.3/9.1.0。
+
+#### 16.28.3 相机
+
+```agui
+camera(px - 300, py - 200, 1.5)
+camera_bounds(0, 0, 2000, 1200)
+camera_shake(8, 0.2)
+```
+
+`camera(x, y, zoom)` 设置世界坐标原点、缩放；无参返回 `{x,y,zoom}`。
+`screen(x, y)` 把世界坐标转换为屏幕坐标。`camera_shake(幅度, 秒)` 产生短震动。
+相机变换只影响 canvas 绘制，不影响窗口控件。
+
+#### 16.28.4 canvas 绘制与精灵
+
+```agui
+c.clear()
+c.rect(20, 20, 100, 40, color="#2563eb", fill=true)
+c.circle(200, 80, 24, color="#f59e0b", fill=true)
+c.line(0, 200, 600, 200, color="#64748b", width=2)
+c.text(20, 250, "Hello", size=20, outline="#000000", outline_width=2)
+
+# 整张图片
+c.image("assets/player.png", 100, 100, w=64, h=64)
+
+# 精灵表：4 列 2 行，取第 3 帧
+c.sprite("assets/hero.png", 100, 100, w=48, h=48, frames=8, cols=4, frame=3)
+
+# 二维 tilemap：0 表示空，其余为图块索引
+c.tilemap(level, "assets/tiles.png", 32, 32)
+```
+
+- `batch_begin()` / `batch_end()`：一帧内多次绘制只触发一次重绘；`flip()` 等价于 `batch_end()`；
+- 绘制先 `clear()`，再画，最后 `batch_end()`；
+- 文字支持 `outline`/`outline_width`；字体按 family/size/bold/italic 缓存；
+- 图片支持 png/jpg/bmp/gif；`screen=true` 的文字不参与相机变换；
+- `tilemap(tiles, path, tile_w, tile_h, x=, y=, ...)` 绘制二维列表。
+
+精灵表动画与帧事件：
+
+```agui
+walk = anim(8, fps=10, loop=true)   # 8 帧，循环
+on walk.frame:
+    c.text(12, 40, "frame " + str(walk.frame), screen=true)
+
+func update(dt):
+    walk.update(dt)                  # 只在帧变化时触发 walk.frame
+    c.batch_begin()
+    c.clear()
+    c.sprite("assets/hero.png", 100, 100, w=48, h=48,
+             frames=8, cols=4, frame=walk.frame)
+    c.batch_end()
+```
+
+`anim(frames, fps=12, loop=true)` 返回动画对象；`update(dt)` 推进，`frame/fps/playing/done` 可读，`reset()/play()/pause()/stop()` 可调用。
+
+#### 16.28.5 粒子
+
+```agui
+particles_emit(x, y, count=12, speed=120, life=0.5, size=3,
+               color="#facc15", gravity=200)
+particles_update(dt)
+particles_draw(c)
+```
+
+`particles_draw` 可省略 canvas 参数，自动使用第一个 canvas。`particles_clear()` 清空。
+粒子按生命周期对颜色做简单的背景混合（alpha fade），不是 GPU 混合模式。
+
+#### 16.28.6 碰撞与数学
+
+| API | 说明 |
+| --- | --- |
+| `aabb(ax, ay, aw, ah, bx, by, bw, bh)` | 轴对齐矩形相交 |
+| `ray_rect(x, y, dx, dy, rx, ry, rw, rh)` | 射线与矩形，返回 `{hit,t,nx,ny}` |
+| `tilemap_collide(tiles, x, y, tile_w, tile_h)` | 点是否落在非 0 图块 |
+
+#### 16.28.7 音频
+
+```agui
+audio_play("assets/bgm.mp3", channel="bgm", loop=true, volume=60)
+audio_play("assets/jump.wav", channel="sfx", volume=100)
+audio_stop("sfx")
+audio_stop_all()
+if audio_playing("bgm"):
+    ...
+```
+
+使用 Windows MCI，支持系统编解码器可播放的 WAV/MP3/OGG；多声道按名称隔离。
+
+#### 16.28.8 全屏、无边框、存档
+
+```agui
+fullscreen(true)
+borderless(true)
+
+save_json("save.json", {"level": 3, "hp": 80})
+data = load_json("save.json", null)
+```
+
+窗口方法也提供 `win.fullscreen(true)` / `win.borderless(true)`。
+`save_json` 原子写入（临时文件 + rename），`load_json` 文件不存在时返回默认值。
+
+#### 16.28.9 示例
+
+- `examples/game_platformer.ag`：平台跳跃，含相机、AABB、粒子、存档；
+- `examples/game_cards.ag`：回合制卡牌，含按钮、能量、随机伤害、快捷键、存档；
+- `examples/game_smoke.ag`：最小循环与绘制自检。
+
+运行：
+
+```powershell
+.\agui.exe run examples\game_platformer.ag
+.\agui.exe run examples\game_cards.ag
+```
+
+已知边界：没有完整物理引擎、地图编辑器或资源管线；MP3/OGG 依赖系统 MCI 编解码器；全屏/手柄在无设备环境未做真机验证。
+
+### 16.29 单文件 Android 构建
+
+同一个 `.ag` 文件可以面向 Windows 或 Android。只在入口文件开头写一次 `#target`，`agui build` 会按平台产出 `.exe` 或 `.apk`：
+
+```agui
+#target android
+#name 星野养成
+#package com.agui.star
+#version 0.1.0
+#icon assets/icon.png
+
+win = window("星野养成", w=420, h=640)
+```
+
+- `#target windows` 为缺省值；只允许一个 `#target`，且必须在代码之前。
+- `#name` 是应用显示名；`#package` 是 Android 包名；`#version` 是版本名；`#icon` 支持 PNG 路径（相对脚本目录）或 data URI；`#permission android.permission.CAMERA` 可重复，声明运行时权限。
+- `agui build app.ag` 生成 `app.exe` 或 `app.apk`；`agui check app.ag` 会校验文件头与包名。
+- Android 端使用原生 View，不使用 WebView；支持 `window/panel/label/button/edit/checkbox/progress/image`，事件 `click/change/close`，以及 `after/every/cancel_timer/quit/toast`。
+- 构建 Android 需要 `android/runtime/agui.aar`（由 `gomobile bind ... ./mobile` 生成）以及 SDK/JDK；`--asset` 可把额外资源打进 APK。
+- 当前 Native 后端只支持 arm64-v8a；未支持 `menu/tray/table/tree` 等 Windows 专属能力。
+- 原生 Canvas/Game Kit 子集已支持：`canvas`、`game_loop`、触摸、`camera`、`aabb`、`save_json/load_json`；完整 Game Kit 仍以 Windows 为准。
+- release 构建：`agui build app.ag --release --ks release.keystore --ks-pass ... --key-alias agui --key-pass ... --version-code 2`。
+- 生命周期：`onPause/onResume` 转发到解释器，返回键触发窗口 `close`；`share(text)` 调系统分享。
+- 系统文件选择：`pick_file("text/plain")` 打开 SAF 选择器；结果复制到应用缓存后触发窗口 `file` 事件，用 `win.file` 读取路径（不需要存储权限）。
+- 运行时权限：`#permission` 声明权限后，调用 `request_permission("android.permission.CAMERA")`；结果触发窗口 `permission` 事件，用 `win.permission` / `win.permission_granted` 读取。
+
+
+### 16.30 工具链：watch / LSP / debug
+
+```powershell
+.\agui.exe watch examples\hello.ag
+.\agui.exe lsp
+.\agui.exe debug examples\hello.ag
+```
+
+- `watch`：350ms 轮询入口文件 mtime，变更后终止并重启脚本；Ctrl+C 退出。
+- `lsp`：stdio 上的 JSON-RPC，提供 `textDocumentSync=1`、基础补全和 `publishDiagnostics`；适合编辑器做最简接入。
+- `debug`：设置 `AGUI_TRACE=1`，每条语句执行前打印 `[debug] 文件:行 源码`；不是断点式调试器。
+
+### 16.31 包命名空间与 lockfile
+
+`import "mathx"` 会执行模块并把新增顶层定义绑定到同名命名空间，因此可以写 `mathx.add(2, 3)`；为兼容旧脚本，直接 `add(2, 3)` 仍然可用。
+
+`agui install` 在写 `packages/<name>.json` 的同时维护当前目录的 `agui.lock`（包名、版本、来源、入口、SHA-256）。`agui verify` 校验内容是否被修改；`agui remove` 同时删除 lock 项。
+
+### 16.32 Windows 深色主题与通知
+
+```agui
+win = window("暗色", 560, 360, theme="dark")
+notify("Agui", "构建完成")
+```
+
+`theme="dark"` 使用深色窗口背景并为未显式设置颜色的控件提供浅色前景。`notify` 通过托盘图标显示气泡；若 Explorer/进程权限拒绝，会返回错误，可用 `tray.last_error` 诊断。
+
+### 16.33 Windows 绿色包、安装脚本与自动更新
+
+```powershell
+.\agui.exe dist examples\hello.ag -o dist
+.\agui.exe update check dist\Agui-应用\update.json
+.\agui.exe update apply dist\Agui-应用\update.json --current "C:\Apps\Agui-应用\Agui-应用.exe"
+```
+
+`dist` 生成：
+
+- `<名称>-<版本>-win64.zip`；
+- `<名称>/<名称>.exe`；
+- `install.ps1`：复制到 `%LOCALAPPDATA%\AguiApps\<名称>` 并创建桌面快捷方式；
+- `uninstall.ps1`：删除安装目录与快捷方式；
+- `update.json`：`name/version/url/sha256/notes`。
+
+`update check` 只读取并显示清单；`update apply` 校验 SHA-256，下载 `url`。若 URL 以 `.zip` 结尾，会从 zip 中取最大的 `.exe`，写到 `<当前exe>.new`，再由一个短暂 PowerShell 脚本在 600ms 后替换并重启。因此更新时应用会退出一次；替换脚本依赖 PowerShell。
+
+`dist --url <地址>` 可把下载地址写入清单；也可以手工编辑 `update.json` 指向 GitHub Releases 等 HTTPS 地址。
+
+### 16.34 Android App Bundle（AAB）
+
+```powershell
+.\agui.exe build examples\android_star.ag --aab --version-code 2 -o build\android\star.aab
+```
+
+`--aab` 复用 APK 构建流程，然后用 `aapt2 link --proto-format` 生成 proto 资源，并重新打包为：
+
+- `BundleConfig.pb`
+- `base/manifest/AndroidManifest.xml`
+- `base/resources.pb`
+- `base/res/...`
+- `base/assets/app.ag`
+- `base/dex/classes.dex`
+- `base/lib/arm64-v8a/libgojni.so`
+
+AAB 不签名；上传 Google Play 时由 Play App Signing 签名。需要本地校验时可安装 bundletool：
+
+```powershell
+java -jar bundletool.jar validate --bundle build\android\star.aab
+```
+
+当前构建器输出的是最小 bundle 结构，未包含密度/语言拆分；未用 bundletool 最终校验前，建议同时保留 APK 作为可直接安装的产物。

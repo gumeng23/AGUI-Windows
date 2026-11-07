@@ -22,6 +22,7 @@ var (
 	pGdipSetInterpolationMode  = gdiplus.NewProc("GdipSetInterpolationMode")
 	pGdipSetSmoothingMode      = gdiplus.NewProc("GdipSetSmoothingMode")
 	pGdipDrawImageRectI        = gdiplus.NewProc("GdipDrawImageRectI")
+	pGdipDrawImageRectRectI    = gdiplus.NewProc("GdipDrawImageRectRectI")
 	pGdipCreateHICONFromBitmap = gdiplus.NewProc("GdipCreateHICONFromBitmap")
 	pGdipCreateHBITMAP         = gdiplus.NewProc("GdipCreateHBITMAPFromBitmap")
 )
@@ -100,6 +101,26 @@ func drawGdiImage(hdc syscall.Handle, img uintptr, x, y, w, h int32) {
 	pGdipSetInterpolationMode.Call(g, 7)
 	pGdipSetSmoothingMode.Call(g, 4)
 	pGdipDrawImageRectI.Call(g, img, uintptr(x), uintptr(y), uintptr(w), uintptr(h))
+}
+
+// drawGdiImageRect draws a source rectangle from an image into a destination
+// rectangle. It is used by the canvas sprite/tilemap renderer.
+func drawGdiImageRect(hdc syscall.Handle, img uintptr, sx, sy, sw, sh, dx, dy, dw, dh int32) {
+	if img == 0 || sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0 {
+		return
+	}
+	var g uintptr
+	if status, _, _ := pGdipCreateFromHDC.Call(uintptr(hdc), uintptr(unsafe.Pointer(&g))); status != 0 || g == 0 {
+		return
+	}
+	defer pGdipDeleteGraphics.Call(g)
+	pGdipSetInterpolationMode.Call(g, 7)
+	pGdipSetSmoothingMode.Call(g, 4)
+	// Unit 2 = Pixel.
+	pGdipDrawImageRectRectI.Call(g, img,
+		uintptr(dx), uintptr(dy), uintptr(dw), uintptr(dh),
+		uintptr(sx), uintptr(sy), uintptr(sw), uintptr(sh),
+		2, 0, 0)
 }
 
 // loadMenuBitmap decodes a png/jpg into an HBITMAP suitable for a menu item.

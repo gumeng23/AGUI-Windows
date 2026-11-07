@@ -1,0 +1,10 @@
+db = sqlite_open(":memory:")
+print(db.exec("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, score REAL)"))
+print(db.execute("INSERT INTO users(name, score) VALUES (?, ?)", "Alice", 9.5))
+print(db.execute("INSERT INTO users(name, score) VALUES (?, ?)", "Bob", 7.25))
+rows = db.query("SELECT id, name, score FROM users ORDER BY id")
+for row in rows:
+    print(row["id"], row["name"], row["score"])
+print("tables", db.tables)
+print(db.exec("CREATE INDEX idx_users_name ON users(name)"))
+db.close()

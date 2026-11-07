@@ -2,6 +2,7 @@ package gui
 
 import (
 	"fmt"
+	"strings"
 
 	"agui/internal/lang"
 )
@@ -24,7 +25,7 @@ func Register(i *lang.Interp) *App {
 			return nil, err
 		}
 		if err := checkKw(kwargs, "title", "w", "width", "h", "height", "bg", "resizable", "icon", "parent",
-			"center", "topmost", "opacity", "state"); err != nil {
+			"center", "topmost", "opacity", "state", "theme"); err != nil {
 			return nil, err
 		}
 		var parent *Widget
@@ -50,11 +51,21 @@ func Register(i *lang.Interp) *App {
 		if !ok {
 			height = 640
 		}
+		theme := strings.ToLower(kwStr(kwargs, "theme", ""))
 		bg := kwStr(kwargs, "bg", "#F7F8FA")
+		if theme == "dark" {
+			if _, explicit := kwargs["bg"]; !explicit {
+				bg = "#0F172A"
+			}
+			app.darkTheme = true
+		}
 		resizable := kwBool(kwargs, "resizable", true)
 		w, err := app.createWindow(title, int(width), int(height), bg, resizable, parent)
 		if err != nil {
 			return nil, err
+		}
+		if theme == "dark" {
+			_ = w.SetProp("fg", "#E2E8F0")
 		}
 		if icon := kwStr(kwargs, "icon", ""); icon != "" {
 			if err := w.setWindowIcon(icon); err != nil {
@@ -135,6 +146,40 @@ func Register(i *lang.Interp) *App {
 			return nil, err
 		}
 		return widget, app.applyCommon(widget, kwargs)
+	})
+
+	reg("tray", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
+		if err := lang.CheckArity("tray", args, 0); err != nil {
+			return nil, err
+		}
+		if err := checkKw(kwargs, "icon", "tooltip", "text"); err != nil {
+			return nil, err
+		}
+		icon := kwStr(kwargs, "icon", "")
+		tooltip := kwStr(kwargs, "tooltip", kwStr(kwargs, "text", "Agui"))
+		return app.newTray(icon, tooltip)
+	})
+
+	reg("notify", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
+		if err := lang.CheckArity("notify", args, 2); err != nil {
+			return nil, err
+		}
+		if err := checkKw(kwargs, "warning"); err != nil {
+			return nil, err
+		}
+		title := lang.ToString(lang.Named(args, kwargs, 0, "title", "Agui"))
+		text := lang.ToString(lang.Named(args, kwargs, 1, "text", ""))
+		if app.tray == nil {
+			t, err := app.newTray("", "Agui")
+			if err != nil {
+				return nil, err
+			}
+			app.tray = t
+		}
+		if err := app.tray.notify(title, text, kwBool(kwargs, "warning", false)); err != nil {
+			return nil, err
+		}
+		return nil, nil
 	})
 
 	reg("groupbox", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
@@ -792,6 +837,49 @@ func Register(i *lang.Interp) *App {
 		return nil, nil
 	})
 
+	reg("play_wav", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
+		if err := lang.CheckArity("play_wav", args, 2); err != nil {
+			return nil, err
+		}
+		if err := checkKw(kwargs, "loop"); err != nil {
+			return nil, err
+		}
+		path := lang.ToString(lang.Pos(args, 0, ""))
+		if path == "" {
+			return nil, fmt.Errorf("play_wav(路径, loop=false) 需要路径")
+		}
+		real, err := app.interp.AssetPath(path)
+		if err != nil {
+			return nil, err
+		}
+		loop := kwBool(kwargs, "loop", false)
+		if len(args) == 2 {
+			loop = lang.Truthy(args[1])
+		}
+		if err := playWAV(real, loop); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	})
+	reg("stop_wav", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
+		if len(args) != 0 || len(kwargs) != 0 {
+			return nil, fmt.Errorf("stop_wav(): 不接受参数")
+		}
+		stopWAV()
+		return nil, nil
+	})
+
+	reg("clipboard_image", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
+		if len(args) != 0 || len(kwargs) != 0 {
+			return nil, fmt.Errorf("clipboard_image(): 不接受参数")
+		}
+		data, err := clipboardImagePNG()
+		if err != nil {
+			return nil, err
+		}
+		return &lang.Bytes{Data: data}, nil
+	})
+
 	reg("get_clipboard", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
 		if len(args) > 0 || len(kwargs) > 0 {
 			return nil, fmt.Errorf("get_clipboard(): 不接受参数")
@@ -817,6 +905,7 @@ func Register(i *lang.Interp) *App {
 		return float64(app.dpi), nil
 	})
 
+	registerGame(i, app)
 	return app
 }
 
@@ -898,6 +987,18 @@ func (a *App) coord(kwargs map[string]lang.Value, names ...string) (*int32, erro
 }
 
 func (a *App) applyCommon(w *Widget, kwargs map[string]lang.Value) error {
+	if a.darkTheme {
+		if _, ok := kwargs["fg"]; !ok && w.kind != "window" {
+			if err := w.SetProp("fg", "#E2E8F0"); err != nil {
+				return err
+			}
+		}
+		if _, ok := kwargs["bg"]; !ok && (w.kind == "button" || w.kind == "edit" || w.kind == "checkbox") {
+			if err := w.SetProp("bg", "#1E293B"); err != nil {
+				return err
+			}
+		}
+	}
 	for _, name := range []string{"fg", "bg"} {
 		if v, ok := kwargs[name]; ok {
 			if err := w.SetProp(name, v); err != nil {

@@ -1,0 +1,477 @@
+package __PACKAGE__;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RectF;
+import android.net.Uri;
+import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import com.agui.runtime.mobile.Bridge;
+import com.agui.runtime.mobile.Mobile;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
+
+public class MainActivity extends Activity implements Bridge {
+    private LinearLayout root;
+    private final Map<Long, View> views = new HashMap<>();
+    private boolean updating = false;
+    private static final int REQ_PICK = 43;
+    private static final int REQ_PERM = 44;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        getWindow().setStatusBarColor(Color.rgb(255, 241, 230));
+        getWindow().setNavigationBarColor(Color.rgb(255, 248, 241));
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(Color.rgb(255, 248, 241));
+
+        root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(20), dp(18), dp(20), dp(28));
+        scroll.addView(root, new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        setContentView(scroll);
+
+        String script;
+        try {
+            InputStream in = getAssets().open("app.ag");
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] tmp = new byte[8192];
+            int n;
+            while ((n = in.read(tmp)) > 0) out.write(tmp, 0, n);
+            in.close();
+            script = out.toString("UTF-8");
+        } catch (Exception e) {
+            Toast.makeText(this, "读取脚本失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+            return;
+        }
+        Mobile.start(script, this);
+    }
+
+    private int dp(int v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+
+    private void add(View v) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = dp(10);
+        root.addView(v, lp);
+    }
+
+    @Override
+    public void addWidget(final long id, final long parent, final String kind, final String text) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                View v;
+                if ("window".equals(kind)) {
+                    setTitle(text);
+                    views.put(id, root);
+                    return;
+                } else if ("panel".equals(kind)) {
+                    LinearLayout box = new LinearLayout(MainActivity.this);
+                    box.setOrientation(LinearLayout.VERTICAL);
+                    v = box;
+                } else if ("label".equals(kind)) {
+                    TextView tv = new TextView(MainActivity.this);
+                    tv.setText(text);
+                    tv.setTextSize(17);
+                    tv.setTextColor(Color.rgb(55, 45, 40));
+                    tv.setPadding(0, dp(4), 0, dp(4));
+                    v = tv;
+                } else if ("button".equals(kind)) {
+                    Button b = new Button(MainActivity.this);
+                    b.setText(text);
+                    b.setAllCaps(false);
+                    b.setTextSize(16);
+                    b.setBackgroundColor(Color.rgb(236, 120, 96));
+                    b.setTextColor(Color.WHITE);
+                    b.setPadding(dp(10), dp(8), dp(10), dp(8));
+                    b.setOnClickListener(new View.OnClickListener() {
+                        @Override public void onClick(View view) { Mobile.dispatchClick(id); }
+                    });
+                    v = b;
+                } else if ("edit".equals(kind)) {
+                    EditText e = new EditText(MainActivity.this);
+                    e.setText(text);
+                    e.setTextSize(16);
+                    e.setSingleLine(false);
+                    e.addTextChangedListener(new TextWatcher() {
+                        @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+                        @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
+                        @Override public void afterTextChanged(Editable s) {
+                            if (!updating) Mobile.dispatchChange(id, s.toString(), false);
+                        }
+                    });
+                    v = e;
+                } else if ("checkbox".equals(kind)) {
+                    CheckBox c = new CheckBox(MainActivity.this);
+                    c.setText(text);
+                    c.setTextSize(16);
+                    c.setOnCheckedChangeListener(new android.widget.CompoundButton.OnCheckedChangeListener() {
+                        @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean checked) {
+                            if (!updating) Mobile.dispatchChange(id, "", checked);
+                        }
+                    });
+                    v = c;
+                } else if ("progress".equals(kind)) {
+                    ProgressBar p = new ProgressBar(MainActivity.this, null, android.R.attr.progressBarStyleHorizontal);
+                    p.setMax(100);
+                    p.setProgress(0);
+                    v = p;
+                } else if ("canvas".equals(kind)) {
+                    v = new AguiCanvas(MainActivity.this, id);
+                } else if ("image".equals(kind)) {
+                    ImageView iv = new ImageView(MainActivity.this);
+                    iv.setAdjustViewBounds(true);
+                    iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    iv.setMinimumHeight(dp(180));
+                    iv.setOnClickListener(new View.OnClickListener() {
+                        @Override public void onClick(View view) { Mobile.dispatchClick(id); }
+                    });
+                    v = iv;
+                } else {
+                    TextView fallback = new TextView(MainActivity.this);
+                    fallback.setText(text);
+                    v = fallback;
+                }
+
+                ViewGroup target = root;
+                if (parent != 0 && views.get(parent) instanceof ViewGroup) {
+                    target = (ViewGroup) views.get(parent);
+                }
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                lp.bottomMargin = dp(10);
+                target.addView(v, lp);
+                views.put(id, v);
+            }
+        });
+    }
+
+    @Override public void setText(final long id, final String text) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                View v = views.get(id);
+                if (v instanceof TextView) {
+                    updating = true;
+                    ((TextView) v).setText(text);
+                    updating = false;
+                }
+            }
+        });
+    }
+
+    @Override public void setProgress(final long id, final long value, final long max) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                View v = views.get(id);
+                if (v instanceof ProgressBar) {
+                    ProgressBar p = (ProgressBar) v;
+                    p.setMax((int)Math.max(1, max));
+                    p.setProgress((int)Math.max(0, Math.min(value, Math.max(1, max))));
+                }
+            }
+        });
+    }
+
+    @Override public void setChecked(final long id, final boolean checked) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                View v = views.get(id);
+                if (v instanceof CheckBox) {
+                    updating = true;
+                    ((CheckBox) v).setChecked(checked);
+                    updating = false;
+                }
+            }
+        });
+    }
+
+    @Override public void setImage(final long id, final String src) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                View v = views.get(id);
+                if (!(v instanceof ImageView)) return;
+                try {
+                    InputStream in = getAssets().open(src);
+                    Bitmap bmp = BitmapFactory.decodeStream(in);
+                    in.close();
+                    ((ImageView) v).setImageBitmap(bmp);
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, "图片不存在：" + src, Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+    }
+
+    @Override public void setStyle(final long id, final String fg, final long size) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                View v = views.get(id);
+                if (v instanceof TextView) {
+                    try {
+                        if (fg != null && !fg.isEmpty()) ((TextView) v).setTextColor(Color.parseColor(fg));
+                    } catch (Exception ignored) {}
+                    if (size > 0) ((TextView) v).setTextSize((int) size);
+                }
+            }
+        });
+    }
+
+    @Override public void setVisible(final long id, final boolean visible) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                View v = views.get(id);
+                if (v != null) v.setVisibility(visible ? View.VISIBLE : View.GONE);
+            }
+        });
+    }
+
+    @Override public void setEnabled(final long id, final boolean enabled) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                View v = views.get(id);
+                if (v != null) v.setEnabled(enabled);
+            }
+        });
+    }
+
+    @Override public void toast(final String text) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                Toast.makeText(MainActivity.this, text, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    @Override public void canvasOps(final long id, final String json) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                View v = views.get(id);
+                if (v instanceof AguiCanvas) ((AguiCanvas) v).setOps(json);
+            }
+        });
+    }
+
+    @Override public void saveData(final String name, final String data) {
+        getSharedPreferences("agui", MODE_PRIVATE).edit().putString(name, data).apply();
+    }
+
+    @Override public String loadData(final String name) {
+        return getSharedPreferences("agui", MODE_PRIVATE).getString(name, "");
+    }
+
+    @Override public void finish() {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                MainActivity.super.finish();
+            }
+        });
+    }
+
+    @Override protected void onPause() {
+        super.onPause();
+        Mobile.pause();
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        Mobile.resume();
+    }
+
+    @Override public void onBackPressed() {
+        Mobile.dispatchClose();
+    }
+
+    @Override public void pickFile(final String mime) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                Intent it = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                it.addCategory(Intent.CATEGORY_OPENABLE);
+                it.setType(mime == null || mime.length() == 0 ? "*/*" : mime);
+                startActivityForResult(it, REQ_PICK);
+            }
+        });
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQ_PICK || resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        Uri uri = data.getData();
+        try {
+            File out = new File(getCacheDir(), "agui-pick-" + System.currentTimeMillis() + ".bin");
+            InputStream in = getContentResolver().openInputStream(uri);
+            if (in == null) throw new Exception("无法打开文件");
+            FileOutputStream fos = new FileOutputStream(out);
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) fos.write(buf, 0, n);
+            fos.close();
+            in.close();
+            Mobile.dispatchFile(out.getAbsolutePath());
+        } catch (Exception e) {
+            Toast.makeText(this, "读取文件失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Override public void requestPermission(final String name) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                if (android.os.Build.VERSION.SDK_INT >= 23) {
+                    requestPermissions(new String[]{name}, REQ_PERM);
+                } else {
+                    Mobile.dispatchPermission(name, true);
+                }
+            }
+        });
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQ_PERM || permissions == null || permissions.length == 0) return;
+        boolean ok = grantResults != null && grantResults.length > 0
+                && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        Mobile.dispatchPermission(permissions[0], ok);
+    }
+
+    @Override public void share(final String text) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                Intent it = new Intent(Intent.ACTION_SEND);
+                it.setType("text/plain");
+                it.putExtra(Intent.EXTRA_TEXT, text);
+                MainActivity.this.startActivity(Intent.createChooser(it, "分享"));
+            }
+        });
+    }
+
+    public static class AguiCanvas extends View {
+        private final long id;
+        private String json = "[]";
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Map<String, Bitmap> bitmaps = new HashMap<>();
+        private final int bg = Color.rgb(15, 23, 42);
+
+        public AguiCanvas(android.content.Context c, long id) {
+            super(c);
+            this.id = id;
+            setBackgroundColor(bg);
+            textPaint.setColor(Color.WHITE);
+            textPaint.setTextSize(18f);
+            setMinimumHeight(Math.round(300 * getResources().getDisplayMetrics().density));
+            setFocusable(true);
+        }
+
+        public void setOps(String json) {
+            this.json = json == null ? "[]" : json;
+            invalidate();
+        }
+
+        private int color(String s, int fallback) {
+            if (s == null || s.isEmpty()) return fallback;
+            try { return Color.parseColor(s); } catch (Exception e) { return fallback; }
+        }
+
+        private Bitmap bitmap(String src) {
+            if (src == null || src.isEmpty()) return null;
+            Bitmap b = bitmaps.get(src);
+            if (b != null) return b;
+            try {
+                InputStream in = getContext().getAssets().open(src);
+                b = BitmapFactory.decodeStream(in);
+                in.close();
+                if (b != null) bitmaps.put(src, b);
+            } catch (Exception ignored) {}
+            return b;
+        }
+
+        @Override protected void onDraw(Canvas c) {
+            super.onDraw(c);
+            try {
+                JSONArray arr = new JSONArray(json);
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject o = arr.getJSONObject(i);
+                    String kind = o.optString("kind");
+                    int col = color(o.optString("color"), Color.WHITE);
+                    float w = (float) o.optDouble("width", 2);
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setStrokeWidth(Math.max(1f, w));
+                    paint.setColor(col);
+                    if ("line".equals(kind)) {
+                        c.drawLine((float)o.optDouble("x1"), (float)o.optDouble("y1"),
+                                   (float)o.optDouble("x2"), (float)o.optDouble("y2"), paint);
+                    } else if ("rect".equals(kind)) {
+                        paint.setStyle(o.optBoolean("fill", true) ? Paint.Style.FILL : Paint.Style.STROKE);
+                        c.drawRect((float)o.optDouble("x1"), (float)o.optDouble("y1"),
+                                   (float)o.optDouble("x1")+(float)o.optDouble("x2"),
+                                   (float)o.optDouble("y1")+(float)o.optDouble("y2"), paint);
+                    } else if ("circle".equals(kind)) {
+                        paint.setStyle(o.optBoolean("fill", true) ? Paint.Style.FILL : Paint.Style.STROKE);
+                        c.drawCircle((float)o.optDouble("x1"), (float)o.optDouble("y1"),
+                                     (float)o.optDouble("r"), paint);
+                    } else if ("text".equals(kind)) {
+                        textPaint.setColor(col);
+                        textPaint.setTextSize((float) o.optDouble("size", 18));
+                        c.drawText(o.optString("text"), (float)o.optDouble("x1"),
+                                   (float)o.optDouble("y1"), textPaint);
+                    } else if ("image".equals(kind)) {
+                        Bitmap b = bitmap(o.optString("src"));
+                        if (b == null) continue;
+                        float x = (float)o.optDouble("x1"), y = (float)o.optDouble("y1");
+                        float dw = (float)o.optDouble("x2", b.getWidth());
+                        float dh = (float)o.optDouble("y2", b.getHeight());
+                        float sw = (float)o.optDouble("sw", 0), sh = (float)o.optDouble("sh", 0);
+                        android.graphics.Rect src = (sw > 0 && sh > 0)
+                            ? new android.graphics.Rect((int)o.optDouble("sx"), (int)o.optDouble("sy"),
+                                                        (int)(o.optDouble("sx")+sw), (int)(o.optDouble("sy")+sh))
+                            : null;
+                        android.graphics.RectF dst = new android.graphics.RectF(x, y, x+dw, y+dh);
+                        c.drawBitmap(b, src, dst, null);
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent e) {
+            int action = e.getActionMasked();
+            int a = action == MotionEvent.ACTION_DOWN ? 0 :
+                    action == MotionEvent.ACTION_UP ? 1 :
+                    action == MotionEvent.ACTION_MOVE ? 2 : 3;
+            Mobile.dispatchTouch(id, (long) a, e.getX(), e.getY());
+            return true;
+        }
+    }
+
+}

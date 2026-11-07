@@ -1,0 +1,13 @@
+# bytes：二进制数据与文本互转
+b = bytes("Agui")
+print(type(b), len(b), b)
+b = b + "!"
+print(b.to_string())
+print(b.slice(0, 2).hex())
+b.push(33)
+print(b.hex())
+
+write_bytes("bytes_demo.bin", b)
+c = read_bytes("bytes_demo.bin")
+print("read", len(c), c.to_string())
+delete_file("bytes_demo.bin")

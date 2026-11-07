@@ -1,0 +1,15 @@
+#target android
+#name 文件选择
+#package com.agui.file
+#version 0.1.0
+
+win = window("文件选择")
+hint = label("选择一个文本文件，内容路径会显示在下面。")
+status = label("尚未选择")
+btn = button("选择文件")
+
+on btn.click:
+    pick_file("text/plain")
+
+on win.file:
+    status.text = "已选择：" + win.file

@@ -1,0 +1,209 @@
+# 星野养成 —— Agui WebView 版 OC 养成 MVP
+# 目标：用少量原生控件表达「日程 + 属性 + 随机事件 + 存档」循环。
+
+win = window("星野养成", w=430, h=820)
+
+title = label("星野养成", class="title")
+subtitle = label("第 1 天 · 今天还有 3 次行动", class="subtitle")
+
+image("oc.svg", w=170, h=170)
+
+stat_line = label("体力 70  ·  心情 70  ·  学识 10  ·  魅力 10  ·  羁绊 0")
+money_line = label("零花钱 20 元", class="small")
+
+energy_bar = progress(70, max=100)
+mood_bar = progress(70, max=100)
+study_bar = progress(10, max=100)
+charm_bar = progress(10, max=100)
+bond_bar = progress(0, max=100)
+
+actions = panel(class="card grid")
+rest_btn = button("休息", class="button ghost")
+study_btn = button("学习", class="button")
+play_btn = button("玩耍", class="button")
+work_btn = button("打工", class="button")
+talk_btn = button("聊天", class="button")
+eat_btn = button("加餐", class="button")
+
+log_label = label("", class="log")
+
+controls = panel(class="card row")
+save_btn = button("保存", class="button ghost")
+load_btn = button("读取", class="button ghost")
+reset_btn = button("重开", class="button ghost")
+
+day = 1
+turn = 0
+money = 20
+stats = {"energy": 70, "mood": 70, "study": 10, "charm": 10, "bond": 0}
+history = []
+
+func add_log(text):
+    history.append("D" + str(day) + " · " + text)
+    if len(history) > 30:
+        history.pop(0)
+    log_label.text = history.join("\n")
+
+func set_stat(key, delta):
+    stats[key] = clamp(stats[key] + delta, 0, 100)
+
+func refresh():
+    subtitle.text = "第 " + str(day) + " 天 · 今天还有 " + str(3 - turn) + " 次行动"
+    stat_line.text = "体力 " + str(round(stats["energy"])) + "  ·  心情 " + str(round(stats["mood"])) + "  ·  学识 " + str(round(stats["study"])) + "  ·  魅力 " + str(round(stats["charm"])) + "  ·  羁绊 " + str(round(stats["bond"]))
+    money_line.text = "零花钱 " + str(round(money)) + " 元"
+    energy_bar.value = stats["energy"]
+    mood_bar.value = stats["mood"]
+    study_bar.value = stats["study"]
+    charm_bar.value = stats["charm"]
+    bond_bar.value = stats["bond"]
+    rest_btn.enabled = turn < 3
+    study_btn.enabled = turn < 3
+    play_btn.enabled = turn < 3
+    work_btn.enabled = turn < 3
+    talk_btn.enabled = turn < 3
+    eat_btn.enabled = turn < 3
+
+func random_event():
+    events = [
+        {"text": "在窗边捡到一枚亮晶晶的纽扣。", "mood": 4, "money": 5},
+        {"text": "读到了一段很喜欢的句子，记进了小本子。", "study": 5, "mood": 3},
+        {"text": "被路边的猫蹭了蹭，心情变好。", "mood": 6},
+        {"text": "帮邻居提了东西，收到一颗糖。", "bond": 4, "money": 3},
+        {"text": "突然下雨，淋湿了衣角。", "mood": -4, "energy": -3},
+        {"text": "翻到以前的照片，想起一些温柔的事。", "bond": 5, "mood": 2}
+    ]
+    ev = events[random_int(0, len(events) - 1)]
+    set_stat("mood", ev.get("mood", 0) + 0)
+    set_stat("study", ev.get("study", 0) + 0)
+    set_stat("charm", ev.get("charm", 0) + 0)
+    set_stat("bond", ev.get("bond", 0) + 0)
+    set_stat("energy", ev.get("energy", 0) + 0)
+    money = money + ev.get("money", 0)
+    add_log(ev["text"])
+
+func pass_time(label):
+    turn = turn + 1
+    add_log(label)
+    if turn >= 3:
+        end_day()
+    else:
+        if random_int(1, 100) <= 35:
+            random_event()
+        refresh()
+
+func end_day():
+    day = day + 1
+    turn = 0
+    set_stat("energy", 30)
+    set_stat("mood", -3)
+    money = money + 8
+    add_log("结束了今天，带着一点点疲惫入睡。")
+    if random_int(1, 100) <= 40:
+        random_event()
+    refresh()
+
+func act(kind):
+    if turn >= 3:
+        toast("今天已经结束了，先睡觉吧")
+        return
+
+    if kind == "rest":
+        set_stat("energy", 28)
+        set_stat("mood", 5)
+        pass_time("好好休息了一会儿。")
+    elif kind == "study":
+        if stats["energy"] < 12:
+            toast("太累了，先休息一下吧")
+            return
+        set_stat("energy", -12)
+        set_stat("study", 7)
+        set_stat("mood", -2)
+        money = money - 2
+        pass_time("在书桌前认真学习。")
+    elif kind == "play":
+        if stats["energy"] < 8:
+            toast("体力不够，玩不动了")
+            return
+        set_stat("energy", -8)
+        set_stat("mood", 10)
+        set_stat("charm", 3)
+        money = money - 4
+        pass_time("出门玩了一会儿。")
+    elif kind == "work":
+        if stats["energy"] < 16:
+            toast("体力不够，没法打工")
+            return
+        set_stat("energy", -16)
+        set_stat("mood", -4)
+        set_stat("charm", 2)
+        money = money + 15
+        pass_time("认真打了一份零工。")
+    elif kind == "talk":
+        if stats["energy"] < 5:
+            toast("累得说不出话了")
+            return
+        set_stat("energy", -5)
+        set_stat("mood", 6)
+        set_stat("bond", 6)
+        set_stat("charm", 2)
+        pass_time("和重要的人聊了很久。")
+    elif kind == "eat":
+        if money < 6:
+            toast("零花钱不够买加餐")
+            return
+        money = money - 6
+        set_stat("energy", 18)
+        set_stat("mood", 4)
+        pass_time("吃了一顿热乎乎的加餐。")
+
+func save_game():
+    storage_set("agui_oc_save", {"day": day, "turn": turn, "money": money, "stats": stats, "history": history})
+    toast("已保存")
+
+func load_game():
+    s = storage_get("agui_oc_save")
+    if s == null:
+        toast("还没有存档")
+        return
+    day = s["day"]
+    turn = s["turn"]
+    money = s["money"]
+    stats = s["stats"]
+    history = s["history"]
+    log_label.text = history.join("\n")
+    refresh()
+    toast("已读取存档")
+
+func reset_game():
+    day = 1
+    turn = 0
+    money = 20
+    stats = {"energy": 70, "mood": 70, "study": 10, "charm": 10, "bond": 0}
+    history = []
+    add_log("新的故事开始了。")
+    refresh()
+    toast("已重新开始")
+
+on rest_btn.click:
+    act("rest")
+on study_btn.click:
+    act("study")
+on play_btn.click:
+    act("play")
+on work_btn.click:
+    act("work")
+on talk_btn.click:
+    act("talk")
+on eat_btn.click:
+    act("eat")
+on save_btn.click:
+    save_game()
+on load_btn.click:
+    load_game()
+on reset_btn.click:
+    reset_game()
+on win.close:
+    quit()
+
+add_log("新的故事开始了。")
+refresh()

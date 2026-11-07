@@ -1,0 +1,4 @@
+print("play", play_wav("../assets/beep.wav"))
+sleep(500)
+stop_wav()
+print("stopped")

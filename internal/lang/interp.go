@@ -1,6 +1,7 @@
 package lang
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -56,6 +57,7 @@ type Interp struct {
 	lastYield time.Time
 	assets    *AssetStore
 	dispatch  func(func())
+	trace     func(int)
 }
 
 // New creates an interpreter with all core built-ins installed.
@@ -89,6 +91,9 @@ func (i *Interp) Dispatch(fn func()) {
 	}
 	i.Protect(fn)
 }
+
+// SetTrace installs a line callback used by the lightweight debugger.
+func (i *Interp) SetTrace(fn func(line int)) { i.trace = fn }
 
 // SetSource records the source text for error messages and sets Source/Lines.
 func (i *Interp) SetSource(name, src string) {
@@ -243,6 +248,12 @@ func (i *Interp) CallValue(fn Value) Value {
 	return i.call(fn, nil, nil)
 }
 
+// CallArgs calls a function value with positional arguments. Game callbacks use
+// it to receive dt without forcing scripts to read a global.
+func (i *Interp) CallArgs(fn Value, args []Value) Value {
+	return i.call(fn, args, nil)
+}
+
 func (i *Interp) asError(r any) error {
 	switch v := r.(type) {
 	case *Error:
@@ -310,6 +321,9 @@ func (i *Interp) execBlock(stmts []ast.Stmt, env *Env) {
 func (i *Interp) execStmt(s ast.Stmt, env *Env) {
 	i.maybeYield()
 	i.line = s.LineNo()
+	if i.trace != nil {
+		i.trace(i.line)
+	}
 	switch n := s.(type) {
 	case *ast.ExprStmt:
 		i.eval(n.X, env)
@@ -460,6 +474,35 @@ func (i *Interp) execImport(n *ast.ImportStmt, env *Env) {
 			return readErr
 		})
 	}
+	if err != nil && os.IsNotExist(err) {
+		pkg := strings.TrimSuffix(filepath.Base(name), ".ag")
+		roots := []string{i.BaseDir()}
+		if wd, e := os.Getwd(); e == nil {
+			roots = append(roots, wd)
+		}
+		for _, root := range roots {
+			if root == "" {
+				continue
+			}
+			for _, cand := range []string{
+				filepath.Join(root, "packages", pkg+".ag"),
+				filepath.Join(root, "packages", pkg, pkg+".ag"),
+				filepath.Join(root, "packages", pkg, "index.ag"),
+				filepath.Join(root, "packages", pkg, "main.ag"),
+			} {
+				if b, readErr := os.ReadFile(cand); readErr == nil {
+					abs, _ := filepath.Abs(cand)
+					key = abs
+					data = b
+					err = nil
+					break
+				}
+			}
+			if err == nil {
+				break
+			}
+		}
+	}
 	if err != nil {
 		i.throw("无法导入 %q: %v", raw, err)
 	}
@@ -481,7 +524,32 @@ func (i *Interp) execImport(n *ast.ImportStmt, env *Env) {
 			panic(r)
 		}
 	}()
+	before := env.Snapshot()
 	i.execBlock(prog.Stmts, env)
+	after := env.Snapshot()
+	mod := NewMap()
+	for k, v := range after {
+		if _, existed := before[k]; !existed {
+			mod.Set(k, v)
+		}
+	}
+	pkg := strings.TrimSuffix(filepath.Base(name), ".ag")
+	pkg = strings.TrimSuffix(pkg, ".AG")
+	if pkg != "" && pkg != "." {
+		var b strings.Builder
+		for idx, r := range pkg {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '_' || (idx > 0 && r >= '0' && r <= '9') {
+				b.WriteRune(r)
+			} else {
+				b.WriteByte('_')
+			}
+		}
+		nameIdent := b.String()
+		if nameIdent == "" || (nameIdent[0] >= '0' && nameIdent[0] <= '9') {
+			nameIdent = "_" + nameIdent
+		}
+		env.Define(nameIdent, &Instance{Class: &Class{Name: nameIdent}, Fields: mod})
+	}
 }
 func (i *Interp) execOn(n *ast.OnStmt, env *Env) {
 	obj := i.eval(n.Target, env)
@@ -881,7 +949,9 @@ func (i *Interp) binary(op token.Type, l, r Value) Value {
 			return ls + ToString(r)
 		}
 		if _, ok := r.(string); ok {
-			return ToString(l) + ToString(r)
+			if _, isBytes := l.(*Bytes); !isBytes {
+				return ToString(l) + ToString(r)
+			}
 		}
 		if ll, ok := l.(*List); ok {
 			if rl, ok := r.(*List); ok {
@@ -902,6 +972,18 @@ func (i *Interp) binary(op token.Type, l, r Value) Value {
 				}
 				return out
 			}
+		}
+		if lb, ok := l.(*Bytes); ok {
+			out := append([]byte(nil), lb.Data...)
+			switch rv := r.(type) {
+			case *Bytes:
+				out = append(out, rv.Data...)
+			case string:
+				out = append(out, []byte(rv)...)
+			default:
+				i.throw("bytes 只能和 bytes/字符串拼接，收到 %s", TypeName(r))
+			}
+			return &Bytes{Data: out}
 		}
 		i.throw("不能把 %s 和 %s 相加", TypeName(l), TypeName(r))
 
@@ -1025,6 +1107,18 @@ func (i *Interp) contains(item, container Value) Value {
 			i.throw("字符串只能判断子串，不能判断 %s", TypeName(item))
 		}
 		return strings.Contains(c, s)
+	case *Bytes:
+		if b, ok := item.(*Bytes); ok {
+			return bytes.Contains(c.Data, b.Data)
+		}
+		if str, ok := item.(string); ok {
+			return bytes.Contains(c.Data, []byte(str))
+		}
+		n, ok := asInt(item)
+		if !ok || n < 0 || n > 255 {
+			i.throw("bytes 只能判断字节、bytes 或子串")
+		}
+		return bytes.Contains(c.Data, []byte{byte(n)})
 	case nil:
 		return false
 	}
@@ -1120,6 +1214,60 @@ func (i *Interp) slice(obj, lo, hi, step Value, hasLo, hasHi, hasStep bool) Valu
 		return pick(o, nil, len(o.Items))
 	case string:
 		return pick(nil, []rune(o), len([]rune(o)))
+	case *Bytes:
+		n := len(o.Data)
+		start, end := 0, n
+		if stepN < 0 {
+			start, end = n-1, -1
+		}
+		index := func(v Value) int {
+			idx, ok := asInt(v)
+			if !ok {
+				i.throw("切片下标必须是整数")
+			}
+			if idx < 0 {
+				idx += n
+			}
+			return idx
+		}
+		if hasLo {
+			start = index(lo)
+		}
+		if hasHi {
+			end = index(hi)
+		}
+		if stepN > 0 {
+			if start < 0 {
+				start = 0
+			}
+			if start > n {
+				start = n
+			}
+			if end < 0 {
+				end = 0
+			}
+			if end > n {
+				end = n
+			}
+		} else {
+			if start >= n {
+				start = n - 1
+			}
+			if start < -1 {
+				start = -1
+			}
+			if end >= n {
+				end = n - 1
+			}
+			if end < -1 {
+				end = -1
+			}
+		}
+		out := make([]byte, 0)
+		for idx := start; (stepN > 0 && idx < end) || (stepN < 0 && idx > end); idx += stepN {
+			out = append(out, o.Data[idx])
+		}
+		return &Bytes{Data: out}
 	default:
 		i.throw("%s 不支持切片", TypeName(obj))
 	}
@@ -1153,6 +1301,18 @@ func (i *Interp) index(obj, key Value) Value {
 			i.throw("字符串下标 %s 越界（长度 %d）", ToString(key), len(runes))
 		}
 		return string(runes[idx])
+	case *Bytes:
+		idx, ok := asInt(key)
+		if !ok {
+			i.throw("bytes 下标必须是整数")
+		}
+		if idx < 0 {
+			idx += len(o.Data)
+		}
+		if idx < 0 || idx >= len(o.Data) {
+			i.throw("bytes 下标 %s 越界（长度 %d）", ToString(key), len(o.Data))
+		}
+		return float64(o.Data[idx])
 	case *Map:
 		k, ok := keyString(key)
 		if !ok {
@@ -1185,6 +1345,22 @@ func (i *Interp) setIndex(obj, key, val Value) {
 			i.throw("列表下标 %s 越界（长度 %d）", ToString(key), len(o.Items))
 		}
 		o.Items[idx] = val
+	case *Bytes:
+		idx, ok := asInt(key)
+		if !ok {
+			i.throw("bytes 下标必须是整数")
+		}
+		if idx < 0 {
+			idx += len(o.Data)
+		}
+		if idx < 0 || idx >= len(o.Data) {
+			i.throw("bytes 下标 %s 越界（长度 %d）", ToString(key), len(o.Data))
+		}
+		n, ok := asInt(val)
+		if !ok || n < 0 || n > 255 {
+			i.throw("bytes 元素必须是 0 到 255 的整数")
+		}
+		o.Data[idx] = byte(n)
 	case *Map:
 		k, ok := keyString(key)
 		if !ok {
@@ -1209,6 +1385,12 @@ func (i *Interp) iterate(v Value) []Value {
 		out := make([]Value, len(runes))
 		for idx, r := range runes {
 			out[idx] = string(r)
+		}
+		return out
+	case *Bytes:
+		out := make([]Value, len(x.Data))
+		for idx, b := range x.Data {
+			out[idx] = float64(b)
 		}
 		return out
 	case *Map:

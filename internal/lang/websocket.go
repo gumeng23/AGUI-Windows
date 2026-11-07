@@ -349,9 +349,11 @@ func (w *WebSocket) GetProp(name string) (Value, bool) {
 		return !w.closed, true
 	case "closed":
 		return w.closed, true
-	case "message", "text", "data":
+	case "message", "text":
+		return w.lastMessage, true
+	case "data", "binary":
 		if w.lastType == "binary" {
-			return string(w.lastBinary), true
+			return &Bytes{Data: append([]byte(nil), w.lastBinary...)}, true
 		}
 		return w.lastMessage, true
 	case "type":
@@ -374,7 +376,13 @@ func (w *WebSocket) CallMethod(name string, args []Value, kwargs map[string]Valu
 	switch name {
 	case "send", "send_text":
 		if len(args) != 1 {
-			return nil, true, fmt.Errorf("send(文本) 需要 1 个参数")
+			return nil, true, fmt.Errorf("send(文本或bytes) 需要 1 个参数")
+		}
+		if b, ok := args[0].(*Bytes); ok {
+			if err := w.writeFrame(2, b.Data); err != nil {
+				return nil, true, err
+			}
+			return nil, true, nil
 		}
 		if err := w.writeFrame(1, []byte(ToString(args[0]))); err != nil {
 			return nil, true, err
@@ -384,7 +392,11 @@ func (w *WebSocket) CallMethod(name string, args []Value, kwargs map[string]Valu
 		if len(args) != 1 {
 			return nil, true, fmt.Errorf("send_binary(数据) 需要 1 个参数")
 		}
-		if err := w.writeFrame(2, []byte(ToString(args[0]))); err != nil {
+		data, err := valueBytes("send_binary", args[0])
+		if err != nil {
+			return nil, true, err
+		}
+		if err := w.writeFrame(2, data); err != nil {
 			return nil, true, err
 		}
 		return nil, true, nil
@@ -422,6 +434,9 @@ func (w *WebSocket) recv(timeout float64) (Value, bool, error) {
 	}
 	select {
 	case msg := <-w.msgs:
+		if msg.typ == "binary" {
+			return &Bytes{Data: append([]byte(nil), msg.data...)}, true, nil
+		}
 		return string(msg.data), true, nil
 	case <-w.done:
 		return nil, true, fmt.Errorf("WebSocket 已关闭")

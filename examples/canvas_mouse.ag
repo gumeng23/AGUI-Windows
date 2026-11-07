@@ -1,0 +1,14 @@
+win = window("Canvas 鼠标", w=560, h=420)
+c = canvas(w=500, h=320, bg="#0F172A")
+status = label("移动鼠标或拖动", fg="#334155")
+on c.mousedown:
+    print("down", c.mouse_x, c.mouse_y, c.mouse_button)
+on c.mousemove:
+    if c.mouse_down:
+        c.circle(c.mouse_x, c.mouse_y, 4, color="#38BDF8", fill=true)
+        c.redraw()
+on c.mouseup:
+    print("up", c.mouse_x, c.mouse_y)
+on c.click:
+    status.text = "点击 " + str(c.mouse_x) + "," + str(c.mouse_y)
+after(6000, quit)

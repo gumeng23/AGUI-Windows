@@ -1,0 +1,135 @@
+# Game Kit 卡牌示例：回合制战斗、能量、格挡、存档
+win = window("星尘卡牌 · Game Kit", 780, 620, bg="#0b1220")
+title = label("星尘卡牌", font=font("Microsoft YaHei UI", 22, bold=true), fg="#f8fafc")
+sub = label("击败失控的星尘守卫。每回合 3 点能量，按 1/2/3 也可出牌。", font=font("Microsoft YaHei UI", 11), fg="#94a3b8")
+
+enemy_hp = 60
+enemy_max = 60
+player_hp = 50
+player_max = 50
+block = 0
+energy = 3
+turn = 1
+log_text = "守卫挡住了去路。"
+
+ebar = progress(enemy_hp, max=enemy_max, w=660)
+pbar = progress(player_hp, max=player_max, w=660)
+elabel = label("星尘守卫  60/60", font=font("Microsoft YaHei UI", 12), fg="#fca5a5")
+plabel = label("你  50/50    格挡 0    能量 3", font=font("Microsoft YaHei UI", 12), fg="#bae6fd")
+log = label(log_text, font=font("Microsoft YaHei UI", 12), fg="#cbd5e1")
+
+func refresh():
+    if enemy_hp < 0:
+        enemy_hp = 0
+    if player_hp < 0:
+        player_hp = 0
+    ebar.value = enemy_hp
+    pbar.value = player_hp
+    elabel.text = "星尘守卫  " + str(enemy_hp) + "/" + str(enemy_max)
+    plabel.text = "你  " + str(player_hp) + "/" + str(player_max) + "    格挡 " + str(block) + "    能量 " + str(energy)
+    log.text = log_text
+
+func enemy_turn():
+    if enemy_hp <= 0:
+        log_text = "守卫倒下了。你赢了！"
+        return
+    dmg = random_int(6, 11)
+    taken = dmg - block
+    if taken < 0:
+        taken = 0
+    player_hp = player_hp - taken
+    block = 0
+    energy = 3
+    turn = turn + 1
+    log_text = "守卫反击 " + str(dmg) + "，实际受到 " + str(taken) + " 点伤害。"
+    if player_hp <= 0:
+        log_text = "你倒下了……点击“重开”再试一次。"
+    refresh()
+
+func play(kind):
+    if player_hp <= 0 or enemy_hp <= 0:
+        log_text = "战斗已经结束，点击“重开”。"
+        refresh()
+        return
+    if kind == "attack":
+        if energy <= 0:
+            log_text = "能量不足。"
+            refresh()
+            return
+        energy = energy - 1
+        dmg = random_int(7, 12)
+        enemy_hp = enemy_hp - dmg
+        log_text = "你打出星刃，造成 " + str(dmg) + " 点伤害。"
+    if kind == "guard":
+        if energy <= 0:
+            log_text = "能量不足。"
+            refresh()
+            return
+        energy = energy - 1
+        block = block + 7
+        log_text = "你举起星盾，获得 7 点格挡。"
+    if kind == "heal":
+        if energy <= 0:
+            log_text = "能量不足。"
+            refresh()
+            return
+        energy = energy - 1
+        player_hp = player_hp + 8
+        if player_hp > player_max:
+            player_hp = player_max
+        log_text = "你饮下星露，恢复 8 点生命。"
+    refresh()
+    if energy <= 0:
+        enemy_turn()
+
+b1 = button("1  星刃  (1 能量)", w=220)
+b2 = button("2  星盾  (1 能量)", w=220)
+b3 = button("3  星露  (1 能量)", w=220)
+saveb = button("存档", w=100)
+loadb = button("读档", w=100)
+resetb = button("重开", w=100)
+
+on b1.click:
+    play("attack")
+on b2.click:
+    play("guard")
+on b3.click:
+    play("heal")
+
+on saveb.click:
+    save_json("card_save.json", {"ehp": enemy_hp, "php": player_hp, "block": block, "energy": energy, "turn": turn, "log": log_text})
+    log_text = "已保存到 card_save.json。"
+    refresh()
+
+on loadb.click:
+    data = load_json("card_save.json", null)
+    if data != null:
+        enemy_hp = data["ehp"]
+        player_hp = data["php"]
+        block = data["block"]
+        energy = data["energy"]
+        turn = data["turn"]
+        log_text = "读档成功：" + data["log"]
+        refresh()
+
+on resetb.click:
+    enemy_hp = 60
+    player_hp = 50
+    block = 0
+    energy = 3
+    turn = 1
+    log_text = "新的战斗开始。"
+    refresh()
+
+on win.keydown:
+    if win.key == "1":
+        play("attack")
+    if win.key == "2":
+        play("guard")
+    if win.key == "3":
+        play("heal")
+
+on win.close:
+    quit()
+
+refresh()

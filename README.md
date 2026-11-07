@@ -1,6 +1,6 @@
 # Agui：为 Windows GUI 而生的解释型语言
 
-Agui 是一门轻量、解释执行的脚本语言。它用接近 Python 的缩进语法，直接创建**原生 Windows 控件**，不需要 Electron、浏览器或额外运行时。解释器本身由 Go + Win32 API 写成，最终产物是一个可以双击运行的独立 `.exe`。当前版本 **0.5.0**。
+Agui 是一门轻量、解释执行的脚本语言。它用接近 Python 的缩进语法，直接创建**原生 Windows 控件**，也能把同一份脚本构建成 **原生 Android 应用**；不需要 Electron、浏览器或额外运行时。解释器本身由 Go 写成，Windows 侧直调 Win32 API，Android 侧经 gomobile 调原生 View。当前版本 **0.9.1**。
 
 ![Agui 窗口示例](docs/images/hello.png)
 
@@ -35,12 +35,14 @@ on win.close:
 - **类 Python 语法**：缩进代码块、`if/elif/else`、`while/for`、`func`、闭包、切片（含步长）、单行/多行 lambda、`try/catch/finally`、`raise`、`import`、轻量 `class`。
 - **事件即语法**：`on btn.click:` 注册点击事件，代码结构一眼可见。
 - **后台任务**：`async(work, then=...)` 返回可等待、可取消的 `task`；任务在后台协作式运行，完成后回到 UI 线程更新界面。
+- **Game Kit**：固定步长游戏循环、键盘/手柄、相机、精灵表、Tilemap、粒子、AABB/射线碰撞、多声道音频、全屏和 JSON 存档，足以制作 2D 小游戏。
 - **布局容器**：`panel` / `scroll` / `grid` 可嵌套，支持明确锚点、滚动和网格排列；隐藏控件不占位。
 - **省心布局**：不写坐标就自动纵向排列；写了 `x/y/w/h` 就精确控制；`anchor=` 让控件贴在父容器边上；窗口缩放时自动重排。
 - **中文关键字别名**：`如果 / 否则 / 对于 / 在 / 函数 / 返回 / 监听 / 尝试 / 捕获 / 导入 / 匿名` 等可直接使用。
 - **单文件打包**：`agui build app.ag` 把脚本和资源一起塞进 exe，双击即运行；可嵌入图标和版本信息。
-- **内置实用库**：消息框、确认框、输入框、文件对话框、文件读写、剪贴板、定时器、截图、格式化字符串、JSON、base64、HTTP、WebSocket。
-- **更多控件**：groupbox 分组容器、treeview、canvas 画布、可编辑/可排序表格、菜单快捷键与图标、文件拖放、radio、状态栏、日期/时间选择器、tooltip。
+- **内置实用库**：消息框、文件对话框、文件读写、剪贴板（文本/图片）、定时器、截图、JSON、base64、HTTP、WebSocket。
+- **二进制与数据**：独立 `bytes` 类型、SQLite（系统 `winsqlite3.dll`）、WAV 播放、包管理器 `agui install/list/remove`。
+- **更多控件**：groupbox、treeview、canvas（鼠标事件）、可编辑/可排序表格、菜单快捷键与图标、文件拖放、radio、状态栏、日期/时间选择器、tooltip、系统托盘。
 - **无第三方依赖**：只用 Go 标准库和系统 DLL。
 
 | 计数器 | 表单 |
@@ -120,6 +122,48 @@ go build -ldflags "-H=windowsgui" -o aguiw.exe ./cmd/agui
 打包后的 exe 也接受 `--shot=文件.png`（截图后退出）和 `--debug`（事件/全局变量调试），方便做自动化截图验证。
 
 > 生成的 exe 默认没有代码签名，Windows SmartScreen 可能提示“未知发布者”。可以用 `scripts/sign.ps1` 做本机自签名，详见 [签名说明](docs/signing.md)。自签名只适合本地测试，SmartScreen 声誉仍需要正式证书和时间积累。
+
+---
+
+## Android：单文件原生应用
+
+从 0.8 开始，同一个 `.ag` 文件可以同时面向 Windows 和 Android。入口文件用 `#target` 声明平台，`agui build` 自动产出 `.exe` 或 `.apk`；Android 不再使用 WebView/WASM/HTML，而是由 Go 解释器通过 gomobile 调用**原生 Android View**。
+
+```agui
+#target android
+#name 星野养成
+#package com.agui.star
+#version 0.1.0
+#icon assets/icon.png
+
+win = window("星野养成")
+title = label("星野养成", size=26, fg="#9A3412")
+energy = progress(value=70, max=100)
+rest = button("休息")
+
+on rest.click:
+    energy.value = 100
+```
+
+```powershell
+# 生成 build/android/star.apk；源码目录不需要 android/ 工程
+.\agui.exe build examples\android_star.ag -o build\android\star.apk
+
+# Windows 仍然走原流程
+.\agui.exe build examples\hello.ag -o hello.exe
+```
+
+单文件构建支持：
+
+- 文件头：`#target windows|android`（缺省 windows）、`#name`、`#package`、`#version`、`#icon`、`#permission`；
+- Android 控件子集：`window/panel/label/button/edit/checkbox/progress/image`，事件 `click/change/close`，以及 `after/every/cancel_timer/quit/toast`；
+- 资源用 `--asset` 嵌入，`image("oc.png")` 从 APK assets 读取；
+- 默认使用 debug keystore 自动签名；release 构建用 `--release --ks release.keystore --ks-pass ... --key-alias agui --key-pass ... --version-code 2`。
+- 原生 Canvas/Game Kit 子集：`canvas`、`game_loop`、触摸、`camera`、`aabb`、`save_json/load_json`；支持 `share(text)`、`pick_file("text/plain")`、`request_permission(...)`。
+- 文件与权限：选择结果走窗口 `file` 事件 / `win.file`；权限结果走窗口 `permission` 事件 / `win.permission_granted`。
+- 生命周期：`onPause/onResume` 会转发到解释器，Android 返回键触发窗口 `close` 事件。
+
+**限制**：当前环境没有 Android 真机/模拟器，APK 已通过 `aapt2 badging`、`apksigner verify` 和 dex/native 结构检查，但安装启动仍需设备验证。Android 端不支持的控件（menu/tray/table/tree/canvas/Game Kit 等）不会静默降级，运行时会报未定义函数；构建期白名单校验是后续工作。旧 WebView 实验代码仍保留在 `cmd/aguiweb`、`internal/webui`、`web/`，不再是默认路线。
 
 ---
 
@@ -343,6 +387,10 @@ on win.close:
 | `tree(items)` | 树形控件 | `items`, `h` |
 | `canvas(w=, h=)` | 自绘画布 | `bg`, `h` |
 | `font("微软雅黑", 14, bold=true)` | 创建字体 | `family`, `size`, `bold`, `italic` |
+| `radio(text, checked=false)` | 单选按钮 | `checked` |
+| `statusbar(text)` | 底部状态栏 | `text`, `parts` |
+| `date(value="")` / `time(value="")` | 日期/时间选择器 | `text`, `value` |
+| `tray(icon=, tooltip=)` | 系统托盘 | `visible`, `last_error`, `item/notify` |
 
 所有控件都接受这些公共参数：`x`, `y`, `w`, `h`, `fg`, `bg`, `font`, `enabled`, `visible`, `anchor`, `parent`（容器/窗口）。
 
@@ -424,9 +472,13 @@ pic.set_src("other.png")
 | `slider` | `change` |
 | `table` | `select`, `click`, `dblclick` |
 | `tree` | `select`, `expand`, `dblclick` |
-| `canvas` | `click` |
+| `canvas` | `click`, `mousedown`, `mousemove`, `mouseup` |
 | `menuitem` | `click` |
 | `progress` | 无 |
+| `radio` | `click`, `change` |
+| `statusbar` | `click`, `dblclick` |
+| `date` / `time` | `change` |
+| `tray` | `click`, `dblclick` |
 
 ```agui
 on list.select:
@@ -434,6 +486,80 @@ on list.select:
 ```
 
 ---
+
+## 0.9 新增能力速览
+
+- **Android 原生 Canvas / Game Kit**：原生 `AguiCanvas` + 触摸事件，支持 `game_loop`、相机、`aabb`、精灵贴图与 `save_json/load_json`。
+- **Android Release**：`--release --ks/--ks-pass/--key-alias/--key-pass/--version-code`，可用正式 keystore 签名；`#version` 与 versionCode 写入 Manifest。
+- **Android 生命周期/系统集成**：`onPause/onResume` 转发 `Mobile.pause/resume`，返回键触发窗口 close；`share(text)` 调用系统分享；`pick_file` 调 SAF 文件选择器；`#permission` + `request_permission` 走运行时权限。
+- **工具链**：`agui watch` 文件变更自动重启；`agui lsp` 提供基础补全/诊断；`agui debug` 输出逐行执行轨迹。
+- **包管理**：`import "pkg"` 生成命名空间 `pkg.fn()`；`agui.lock` + `agui verify` 做 SHA-256 完整性校验。
+- **Windows 发布**：`agui dist app.ag` 生成绿色目录、zip、`install.ps1`/`uninstall.ps1` 与 `update.json`；`agui update check|apply` 支持本地/HTTP 清单与 zip 更新包。
+- **Android AAB**：`agui build app.ag --aab` 生成 App Bundle（未签名，上传 Play 时由商店签名）。
+- **Windows 主题/通知**：`window(theme="dark")` 深色主题；`notify(title, text)` 托盘气泡通知（受 Explorer 权限限制）。
+
+## 0.8 新增能力速览
+
+- **单文件 Android**：`#target android` + `agui build app.ag` 直接生成 APK，Go 解释器经 gomobile 调用原生 View，不使用 WebView。
+- **构建分流**：同一脚本可声明 Windows/Android；`#name/#package/#version/#icon` 写入 Manifest 与资源。
+- **原生控件子集**：window/panel/label/button/edit/checkbox/progress/image，click/change/close，定时器与 toast。
+
+## 0.7 新增能力速览
+
+- **Game Kit**：`game_loop(update, fps=60)` 固定步长循环，`dt` / `game_time` / `game_frame`。
+- **输入**：`key_down` / `key_pressed` / `key_released`，`bind` 动作映射，XInput 手柄。
+- **画面**：canvas 双缓冲、图片/精灵表、`anim()` 动画帧事件、Tilemap、相机缩放/震动/边界、粒子淡出、文字描边与字体缓存。
+- **物理与数据**：`aabb`、`ray_rect`、`tilemap_collide`、`save_json` / `load_json`。
+- **声音与全屏**：MCI 多声道 WAV/MP3/OGG，`fullscreen(true)` / `borderless(true)`。
+- **示例**：平台跳跃 `game_platformer.ag`、回合制卡牌 `game_cards.ag`。
+
+```agui
+win = window("小游戏", 640, 480, bg="#0b1220")
+c = canvas(w=600, h=380, bg="#0f172a")
+
+px = 100
+py = 100
+
+func update(dt):
+    if key_down("right"):
+        px = px + 220 * dt
+    if key_down("left"):
+        px = px - 220 * dt
+    c.batch_begin()
+    c.clear()
+    c.circle(px, py, 18, color="#38bdf8", fill=true)
+    c.text(12, 12, "FPS " + str(round(1 / dt)), color="#e2e8f0", screen=true)
+    c.batch_end()
+
+game_loop(update, fps=60)
+```
+
+| 平台跳跃 | 回合制卡牌 |
+| --- | --- |
+| ![平台跳跃](docs/images/game_platformer.png) | ![卡牌](docs/images/game_cards.png) |
+
+## 0.6 新增能力速览
+
+- **bytes**：独立字节数组，支持切片/拼接/文件/HTTP/WebSocket 二进制帧。
+- **系统托盘**：`tray()`，右键菜单、气泡通知、图标切换、最小化到托盘。
+- **剪贴板图片**：`clipboard_image()` 返回 PNG bytes。
+- **音频**：`play_wav()` / `stop_wav()`。
+- **RichEdit 增强**：选区、插入文字、超链接、插图。
+- **SQLite**：`sqlite_open()`、`exec/execute/query`、索引、异步查询。
+- **Canvas 鼠标事件**：`mousedown` / `mousemove` / `mouseup`。
+- **包管理器**：`agui install/list/remove`，`import` 自动解析 `packages/`。
+
+```agui
+b = bytes("Agui")
+b = b + "!"
+print(b.hex())
+
+db = sqlite_open(":memory:")
+db.exec("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)")
+db.execute("INSERT INTO t(name) VALUES (?)", "Agui")
+print(db.query("SELECT * FROM t"))
+db.close()
+```
 
 ## 0.5 新增能力速览
 
@@ -538,6 +664,34 @@ HTTP：`http_get`、`http_post`、`http_put`、`http_patch`、`http_delete`、`h
 
 WebSocket：`ws_connect(url, headers=, timeout=15, protocols=, origin=, insecure=false)`；事件 `open/message/close/error`；方法 `send`、`send_binary`、`recv(timeout=5)`、`ping`、`close`；属性 `connected`、`closed`、`message`、`type`、`count`、`last_error`。详见 [docs/language.md](docs/language.md) 16.21/16.22。
 
+### bytes、SQLite、音频与托盘
+
+```agui
+b = bytes("Agui") + "!"
+write_bytes("demo.bin", b)
+print(read_bytes("demo.bin").hex())
+print(hex_encode(b))
+
+db = sqlite_open(":memory:")
+db.exec("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)")
+db.execute("INSERT INTO t(name) VALUES (?)", "Agui")
+print(db.query("SELECT * FROM t"))
+db.close()
+
+png = clipboard_image()          # bytes 或 nil
+play_wav("assets/beep.wav")
+stop_wav()
+
+t = tray(icon="assets/app.ico", tooltip="Agui")
+print(t.visible, t.last_error)
+```
+
+- bytes：`bytes`、`to_bytes`、`bytes_to_string`、`read_bytes`、`write_bytes`、`append_bytes`、`hex_encode`、`hex_decode`；方法 `len/push/pop/clear/slice/to_string/hex`。
+- SQLite：`sqlite_open`；方法 `exec/execute/query/close`；属性 `tables/last_error/path/closed`。
+- 音频：`play_wav(path, loop=false)`、`stop_wav()`。
+- 托盘：`tray(icon=, tooltip=)`；`item/notify/set_icon/set_tooltip`；受限环境会降级并记录 `last_error`。
+- 包管理：`agui install <URL/路径> [名称]`、`agui list`、`agui remove <名称>`，安装到 `packages/`。
+
 ### 对话框与剪贴板
 
 ```agui
@@ -628,6 +782,15 @@ print(script_path)    # 脚本路径；打包后为 "内置脚本"
 | [http.ag](examples/http.ag) | HTTP GET、状态/耗时/响应体读取 |
 | [websocket.ag](examples/websocket.ag) | WebSocket 连接、消息事件与关闭 |
 | [gui_extras.ag](examples/gui_extras.ag) | radio、状态栏、日期/时间、tooltip、窗口控制 |
+| [bytes.ag](examples/bytes.ag) | bytes 构造、拼接、切片、文件读写 |
+| [sqlite.ag](examples/sqlite.ag) | SQLite 建表、参数化插入、查询、索引 |
+| [richedit_enhanced.ag](examples/richedit_enhanced.ag) | RichEdit 选区、链接、插图 |
+| [tray.ag](examples/tray.ag) | 系统托盘与右键菜单（受限环境会降级） |
+| [audio.ag](examples/audio.ag) | WAV 播放/停止 |
+| [canvas_mouse.ag](examples/canvas_mouse.ag) | Canvas 鼠标按下/移动/抬起 |
+| [game_platformer.ag](examples/game_platformer.ag) | Game Kit 平台跳跃：相机、AABB、粒子、存档 |
+| [game_cards.ag](examples/game_cards.ag) | Game Kit 回合制卡牌：能量、随机伤害、快捷键 |
+| [game_smoke.ag](examples/game_smoke.ag) | 最小游戏循环与绘制自检 |
 
 `todo.ag` 的界面：
 
@@ -670,16 +833,22 @@ print(script_path)    # 脚本路径；打包后为 "内置脚本"
 ```text
 agui/
 ├─ cmd/agui/            命令行入口、run/check/build/init、脚本打包
+├─ cmd/aguiweb/         旧 WebView/WASM 入口（保留兼容）
 ├─ internal/
 │  ├─ token/            词法单元
 │  ├─ lexer/            缩进敏感的扫描器
 │  ├─ ast/              语法树
 │  ├─ parser/           递归下降 + 运算符优先级
-│  ├─ lang/             值、环境、解释器、方法、内置函数、任务、资源包
-│  ├─ gui/              Win32 绑定、控件、布局容器、图片、富文本、表格、树、画布
+│  ├─ lang/             值、环境、解释器、方法、内置函数、任务、资源包、SQLite、HTTP、WebSocket
+│  ├─ gui/              Win32 绑定、控件、布局容器、图片、富文本、表格、树、画布、托盘、音频
+│  ├─ webui/            旧 DOM 控件后端（js/wasm）
 │  └─ winres/           PE 图标/版本资源写入
+├─ web/                 旧 WebView 版《星野养成》
+├─ mobile/              原生 Android View 运行时（gomobile）
+├─ android/             Android 构建模板、图标、AAR 与说明
 ├─ examples/            示例脚本
-├─ assets/              示例图片和图标
+├─ packages/            安装的第三方 .ag 包
+├─ assets/              示例图片、图标和音频
 ├─ scripts/sign.ps1     本机自签名脚本
 ├─ scripts/ws_echo.py   WebSocket 回显示例服务
 ├─ docs/language.md     语言与 GUI API 参考
@@ -696,14 +865,24 @@ agui/
 - 多行 lambda 不能直接写在函数调用的圆括号里（括号内不产生换行/缩进）；先赋值再传。
 - `import` 是文本级包含；运行时错误仍以主文件行号显示，错误消息里会包含导入文件路径，没有独立源码映射。
 - 菜单支持两级子菜单、真实快捷键与图标；没有动态插入/删除整段菜单的重建 API。
-- 富文本复杂排版（表格、图片、超链接）仍需要直接使用 Win32 消息。
+- Android 原生版仍是子集：menu/tray/table/tree 等 Windows 能力未移植；canvas/Game Kit 仅核心 2D 子集。APK 已通过静态结构与签名验证，但当前环境无真机/模拟器，安装启动验证待补。
+- Android AAB 已支持生成但未用 bundletool 做最终校验；AAB 不签名，上传 Google Play 时由商店签名。
+- Windows 安装包是便携目录 + PowerShell 安装/卸载脚本，不是 MSI；`agui update apply` 已支持 zip 更新包，但仍会短暂启动 PowerShell 替换 exe。
+- 托盘通知 `notify` 依赖 Explorer 的 Shell_NotifyIcon 权限；当前受限终端可能返回 Access denied。
+- 富文本支持选区、超链接和插图；复杂表格/分页排版仍需要直接使用 Win32 消息。
 - 表格支持编辑、排序和 `edit` 事件；没有虚拟化、多选、列宽拖拽保存、分组。
-- treeview 与 canvas 是基础封装：tree 没有拖拽节点/多选；canvas 没有贝塞尔曲线、图片、路径填充。
+- treeview 与 canvas 是基础封装：tree 没有拖拽节点/多选；canvas 没有贝塞尔曲线、路径填充、渐变和混合模式。
 - 布局容器支持纵向、网格、锚点和滚动；没有百分比尺寸、flex 权重和水平流式换行。
 - 自绘按钮支持纯色背景和文字色；渐变、圆角、图标需要后续扩展。
 - 异步任务是协作式的：CPU 密集脚本会在语句间让出，但单条不可中断的原生调用返回前无法响应取消。
 - `screenshot()` 截取的是指定窗口（默认活动窗口）；多窗口时请传窗口对象。
+- 托盘依赖 Explorer；部分受限进程会得到“拒绝访问”，`tray.last_error` 会记录，功能降级。
+- RichEdit 插图通过 RTF/剪贴板完成，会覆盖系统剪贴板；不同 RichEdit 版本显示效果可能不同。
+- SQLite 依赖 Windows 自带的 `winsqlite3.dll`；包管理器是文本级包含，没有版本依赖求解和命名空间隔离。
 - 生成的 exe 未签名时可能触发 SmartScreen；自签名只能缓解本地信任，不能建立 SmartScreen 声誉。
+- Game Kit 是轻量 2D 运行时：没有完整物理引擎、地图编辑器、场景图或资源管线。
+- Game Kit 的 MP3/OGG 播放依赖 Windows MCI 编解码器；多声道音频、全屏和手柄在无设备环境下尚未做真机验证。
+- canvas 精灵/图片只支持 GDI+ 能解码的 PNG/JPG/BMP/GIF，暂不支持 WebP/AVIF 和自定义着色器。
 
 ## 开发与测试
 

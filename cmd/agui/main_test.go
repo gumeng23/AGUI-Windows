@@ -122,6 +122,16 @@ func TestParseBuildArgsOutputEquals(t *testing.T) {
 	}
 }
 
+func TestParseBuildArgsAAB(t *testing.T) {
+	_, _, opts, err := parseBuildArgs([]string{"app.ag", "--aab", "--release", "--version-code", "7"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !opts.aab || !opts.release || opts.versionCode != 7 {
+		t.Fatalf("opts = %+v", opts)
+	}
+}
+
 func TestParseBuildArgsVersion(t *testing.T) {
 	_, _, opts, err := parseBuildArgs([]string{"app.ag", "--file-version=2.3.4.5", "--company=Agui"})
 	if err != nil {

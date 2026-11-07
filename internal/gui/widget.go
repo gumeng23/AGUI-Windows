@@ -85,9 +85,18 @@ type Widget struct {
 	treeLabels map[syscall.Handle]string
 	treePaths  map[string]syscall.Handle
 
-	canvasOps []canvasOp
-	mouseX    float64
-	mouseY    float64
+	canvasOps   []canvasOp
+	canvasBatch bool
+	mouseX      float64
+	mouseY      float64
+	mouseDown   bool
+	mouseButton string
+	key         string
+
+	// Fullscreen/borderless restore state.
+	fullscreen    bool
+	windowedStyle uint32
+	windowedRect  rect
 
 	// Extra controls (statusbar/date/time/tooltip).
 	statusParts    []string
@@ -95,6 +104,7 @@ type Widget struct {
 	tooltip        string
 	tooltipInfo    toolInfoW
 	tooltipTracked bool
+	richLinks      []richLink
 	opacity        float64
 }
 
@@ -102,7 +112,7 @@ type Widget struct {
 func (w *Widget) Kind() string { return w.kind }
 
 var validEvents = map[string]map[string]bool{
-	"window":    {"close": true, "resize": true, "drop": true},
+	"window":    {"close": true, "resize": true, "drop": true, "keydown": true, "keyup": true},
 	"label":     {"click": true, "dblclick": true},
 	"button":    {"click": true},
 	"checkbox":  {"click": true, "change": true},
@@ -119,7 +129,7 @@ var validEvents = map[string]map[string]bool{
 	"image":     {"click": true, "dblclick": true},
 	"table":     {"select": true, "click": true, "dblclick": true, "edit": true},
 	"tree":      {"select": true, "expand": true, "dblclick": true},
-	"canvas":    {"click": true},
+	"canvas":    {"click": true, "mousedown": true, "mouseup": true, "mousemove": true},
 }
 
 // Listen implements lang.Widget.
@@ -458,6 +468,8 @@ func (w *Widget) GetProp(name string) (lang.Value, bool) {
 			return w.isTopmost(), true
 		case "opacity":
 			return w.opacity, true
+		case "key":
+			return w.key, true
 		}
 	case "label", "button", "checkbox", "radio", "edit", "richedit":
 		if name == "text" {
@@ -465,6 +477,20 @@ func (w *Widget) GetProp(name string) (lang.Value, bool) {
 		}
 		if name == "checked" && (w.kind == "checkbox" || w.kind == "radio") {
 			return sendMessage(w.hwnd, bmGetCheck, 0, 0) == bstChecked, true
+		}
+		if w.kind == "richedit" {
+			switch name {
+			case "selection_start":
+				start, _ := w.richSelection()
+				return float64(start), true
+			case "selection_end":
+				_, end := w.richSelection()
+				return float64(end), true
+			case "selected_text":
+				return w.richSelectedText(), true
+			case "link_count":
+				return float64(len(w.richLinks)), true
+			}
 		}
 	case "statusbar":
 		switch name {
@@ -534,6 +560,10 @@ func (w *Widget) GetProp(name string) (lang.Value, bool) {
 			return w.mouseX, true
 		case "mouse_y":
 			return w.mouseY, true
+		case "mouse_down":
+			return w.mouseDown, true
+		case "mouse_button":
+			return w.mouseButton, true
 		case "count":
 			return float64(len(w.canvasOps)), true
 		}
@@ -882,6 +912,18 @@ func (w *Widget) SetProp(name string, v lang.Value) error {
 		case "text":
 			setWindowText(w.hwnd, lang.ToString(v))
 			return nil
+		case "selection":
+			if w.kind != "richedit" {
+				return fmt.Errorf("selection 只适用于 richedit")
+			}
+			list, ok := v.(*lang.List)
+			if !ok || len(list.Items) != 2 {
+				return fmt.Errorf("selection 必须是 [start, end]")
+			}
+			a, _ := list.Items[0].(float64)
+			b, _ := list.Items[1].(float64)
+			w.richSelectRange(int32(a), int32(b))
+			return nil
 		case "checked":
 			if w.kind == "checkbox" || w.kind == "radio" {
 				val := uintptr(0)
@@ -1180,6 +1222,34 @@ func (w *Widget) CallMethod(name string, args []lang.Value, kwargs map[string]la
 		}
 		sendMessage(w.hwnd, lvmDeleteItem, uintptr(int(f)), 0)
 		return nil, true, nil
+	case "image", "sprite":
+		if w.kind != "canvas" {
+			return nil, true, fmt.Errorf("image 只适用于 canvas")
+		}
+		return nil, true, w.canvasImage(args, kwargs)
+	case "tilemap":
+		if w.kind != "canvas" {
+			return nil, true, fmt.Errorf("tilemap 只适用于 canvas")
+		}
+		return nil, true, w.canvasTilemap(args, kwargs)
+	case "batch_begin":
+		w.canvasBatchBegin()
+		return nil, true, nil
+	case "batch_end", "flip":
+		w.canvasBatchEnd()
+		return nil, true, nil
+	case "fullscreen":
+		if w.kind != "window" {
+			return nil, true, fmt.Errorf("fullscreen 只适用于 window")
+		}
+		v, err := w.nativeFullscreen(args, kwargs)
+		return v, true, err
+	case "borderless":
+		if w.kind != "window" {
+			return nil, true, fmt.Errorf("borderless 只适用于 window")
+		}
+		v, err := w.nativeBorderless(args, kwargs)
+		return v, true, err
 	case "clear":
 		switch w.kind {
 		case "edit", "richedit":
@@ -1351,6 +1421,65 @@ func (w *Widget) CallMethod(name string, args []lang.Value, kwargs map[string]la
 			return nil, true, fmt.Errorf("select_all 只适用于 richedit")
 		}
 		sendMessage(w.hwnd, emSetSel, 0, ^uintptr(0))
+		return nil, true, nil
+	case "select_range":
+		if w.kind != "richedit" {
+			return nil, true, fmt.Errorf("select_range 只适用于 richedit")
+		}
+		if len(args) < 2 {
+			return nil, true, fmt.Errorf("select_range(start, end) 需要两个参数")
+		}
+		a, ok1 := args[0].(float64)
+		b, ok2 := args[1].(float64)
+		if !ok1 || !ok2 {
+			return nil, true, fmt.Errorf("select_range 参数必须是数字")
+		}
+		w.richSelectRange(int32(a), int32(b))
+		return nil, true, nil
+	case "selected_text":
+		if w.kind != "richedit" {
+			return nil, true, fmt.Errorf("selected_text 只适用于 richedit")
+		}
+		return w.richSelectedText(), true, nil
+	case "selection":
+		if w.kind != "richedit" {
+			return nil, true, fmt.Errorf("selection 只适用于 richedit")
+		}
+		start, end := w.richSelection()
+		return lang.NewList([]lang.Value{float64(start), float64(end)}), true, nil
+	case "insert_text":
+		if w.kind != "richedit" {
+			return nil, true, fmt.Errorf("insert_text 只适用于 richedit")
+		}
+		w.richInsertText(lang.ToString(lang.Pos(args, 0, "")), false)
+		return nil, true, nil
+	case "replace_selection":
+		if w.kind != "richedit" {
+			return nil, true, fmt.Errorf("replace_selection 只适用于 richedit")
+		}
+		w.richInsertText(lang.ToString(lang.Pos(args, 0, "")), true)
+		return nil, true, nil
+	case "insert_image":
+		if w.kind != "richedit" {
+			return nil, true, fmt.Errorf("insert_image 只适用于 richedit")
+		}
+		if len(args) < 1 {
+			return nil, true, fmt.Errorf("insert_image(图片) 需要一个参数")
+		}
+		return nil, true, w.richInsertImage(args[0])
+	case "link":
+		if w.kind != "richedit" {
+			return nil, true, fmt.Errorf("link 只适用于 richedit")
+		}
+		if len(args) < 2 {
+			return nil, true, fmt.Errorf("link(文字, URL) 需要两个参数")
+		}
+		return nil, true, w.richLink(lang.ToString(args[0]), lang.ToString(args[1]))
+	case "scroll_caret":
+		if w.kind != "richedit" {
+			return nil, true, fmt.Errorf("scroll_caret 只适用于 richedit")
+		}
+		sendMessage(w.hwnd, emScrollCaret, 0, 0)
 		return nil, true, nil
 	case "close":
 		if w.kind == "window" {
