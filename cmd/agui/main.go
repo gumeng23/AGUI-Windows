@@ -46,6 +46,8 @@ func main() {
 		return
 	}
 	switch args[0] {
+	case "designer":
+		runDesigner(args[1:])
 	case "run":
 		file, shot, rest, debug, err := parseRunArgs(args[1:])
 		if err != nil {
@@ -246,6 +248,7 @@ func usage() {
   agui run  <脚本.ag> [参数...]      运行脚本
   agui check <脚本.ag>               只做语法检查
   agui init [目录] [--name 名称]     生成一个可运行的示例项目
+  agui designer [设计.ag] [--shot=图.png] 打开可视化 GUI 设计器（Windows）
   agui build <脚本.ag> [-o 输出]    按 #target 打包 exe 或 apk（默认 Windows exe）
   agui dist <脚本.ag>               生成 Windows 绿色包/安装脚本/update.json
   agui update check|apply <清单>    检查或应用自动更新（--current 当前exe）

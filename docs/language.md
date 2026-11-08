@@ -1933,3 +1933,28 @@ java -jar bundletool.jar validate --bundle build\android\star.aab
 ```
 
 当前构建器输出的是最小 bundle 结构，未包含密度/语言拆分；未用 bundletool 最终校验前，建议同时保留 APK 作为可直接安装的产物。
+
+## 17. 可视化设计器（Windows）
+
+```powershell
+.\\agui.exe designer
+.\\agui.exe designer examples\\designer_demo.ag
+```
+
+设计器由 `internal/designer/designer.ag` 实现，随 `agui.exe` 内嵌，不需要额外安装文件。
+
+- 左侧控件库拖到中间设计区即可新增控件；支持标签、按钮、输入框、复选框、单选、列表、下拉框、进度条、滑块、表格、树。
+- 点击控件选中，拖动移动，拖右下角黄色方块缩放；方向键微调，`Shift`+方向键快速移动，`Delete` 删除。
+- 顶部“文本”“位置”“事件”按钮打开输入框；“事件”可绑定 `click` / `change` / `select` / `dblclick`，多条语句用 `;;` 分隔。
+- “保存”把布局元数据写进 `.ag` 首行注释，同时生成可运行代码；“打开”会识别 `# @agui-layout ` 并恢复成图形布局。
+- `Ctrl+S` 保存，`Ctrl+O` 打开。
+- 导出的 `.ag` 可以 `agui check`、`agui run`，也可以 `agui build` 打包。
+
+布局元数据示例：
+
+```agui
+# @agui-designer v1
+# @agui-layout {"version":1,"design":{"title":"示例","width":420,"height":260,"bg":"#0F172A"},"widgets":[],"events":{}}
+```
+
+注意：设计器是 MVP，属性面板目前展示选中控件信息，文本/位置/事件通过顶部按钮编辑；尚未提供多选、对齐线、撤销/重做、复制粘贴和控件层级面板。

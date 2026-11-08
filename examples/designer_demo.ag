@@ -1,0 +1,13 @@
+# @agui-designer v1
+# @agui-layout {"design":{"bg":"#0F172A","height":260,"title":"设计器示例","width":420},"events":{"btn_1":{"click":"label_1.text = \"你好，设计器\""}},"version":1,"widgets":[{"bg":"","checked":false,"fg":"","h":28,"id":"label_1","items":["选项 1","选项 2","选项 3"],"kind":"label","text":"等待点击","w":200,"x":40,"y":40},{"bg":"","checked":false,"fg":"","h":34,"id":"btn_1","items":["选项 1","选项 2","选项 3"],"kind":"button","text":"点我","w":120,"x":40,"y":90}]}
+# 由 Agui 可视化设计器生成；可再次用 agui designer 打开。
+
+win = window("设计器示例", 420, 260, bg="#0F172A")
+
+label_1 = label("等待点击", x=40, y=40, w=200, h=28)
+
+btn_1 = button("点我", x=40, y=90, w=120, h=34)
+
+on btn_1.click:
+    label_1.text = "你好，设计器"
+

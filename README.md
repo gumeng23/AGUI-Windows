@@ -65,6 +65,7 @@ on win.close:
 - **Per-Monitor DPI**：Windows 10 1703+ 默认 Per-Monitor V2，跨不同缩放比例的显示器时自动更新字体并重排。
 - **省心布局**：不写坐标就自动纵向排列；写了 `x/y/w/h` 就精确控制；`anchor=` 让控件贴在父容器边上；窗口缩放时自动重排。
 - **中文关键字别名**：`如果 / 否则 / 对于 / 在 / 函数 / 返回 / 监听 / 尝试 / 捕获 / 导入 / 匿名` 等可直接使用。
+- **可视化设计器**：`agui designer` 打开拖拽式 GUI 设计器，拖入控件、移动/缩放、编辑文本与位置、绑定事件，保存为可再次图形化打开的 `.ag`，也可直接导出运行。
 - **单文件打包**：`agui build app.ag` 把脚本和资源一起塞进 exe，双击即运行；可嵌入图标和版本信息。
 - **内置实用库**：消息框、文件对话框、文件读写、剪贴板（文本/图片）、定时器、截图、JSON、base64、HTTP、WebSocket。
 - **二进制与数据**：独立 `bytes` 类型、SQLite（系统 `winsqlite3.dll`）、WAV 播放、包管理器 `agui install/list/search/outdated/upgrade/remove`（支持 registry 包名、版本约束、依赖与 SHA-256 校验）。
@@ -792,6 +793,7 @@ print(script_path)    # 脚本路径；打包后为 "内置脚本"
 
 | 文件 | 说明 |
 | --- | --- |
+| [designer_demo.ag](examples/designer_demo.ag) | 设计器示例：布局元数据 + 按钮事件，可用 `agui designer` 打开 |
 | [hello.ag](examples/hello.ag) | 最小窗口、按钮、消息框 |
 | [counter.ag](examples/counter.ag) | 事件、变量、字体、关闭事件 |
 | [form.ag](examples/form.ag) | 输入框、复选框、下拉框、列表、进度条、滑块 |

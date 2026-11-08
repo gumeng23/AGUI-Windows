@@ -1,0 +1,667 @@
+# Agui 可视化设计器（Windows）
+# 由 agui designer 启动；导出的 .ag 首行保存布局元数据，可再次打开。
+
+PAL_X = 10
+PAL_Y = 12
+PAL_W = 168
+DES_X = 190
+DES_Y = 10
+DES_W = 700
+DES_H = 580
+INS_X = 902
+INS_W = 248
+DESIGN_W = 680
+DESIGN_H = 560
+CANVAS_W = 1160
+CANVAS_H = 700
+PAL_ROW = 34
+PAL_TOP = 40
+
+design = {"title": "未命名窗口", "width": DESIGN_W, "height": DESIGN_H, "bg": "#0F172A"}
+widgets = []
+events = {}
+selected = -1
+drag_mode = ""
+drag_kind = ""
+drag_dx = 0
+drag_dy = 0
+current_path = ""
+dirty = false
+status_msg = "拖拽左侧控件到设计区；选中后可移动/缩放"
+next_id = 1
+palette = []
+
+func init_palette():
+    return [
+        {"kind": "label", "label": "标签  Label", "w": 120, "h": 28, "text": "标签"},
+        {"kind": "button", "label": "按钮  Button", "w": 120, "h": 34, "text": "按钮"},
+        {"kind": "edit", "label": "输入框  Edit", "w": 180, "h": 34, "text": ""},
+        {"kind": "checkbox", "label": "复选框  Check", "w": 130, "h": 30, "text": "复选项"},
+        {"kind": "radio", "label": "单选  Radio", "w": 130, "h": 30, "text": "单选项"},
+        {"kind": "listbox", "label": "列表  ListBox", "w": 180, "h": 110, "text": ""},
+        {"kind": "combo", "label": "下拉框  Combo", "w": 180, "h": 34, "text": ""},
+        {"kind": "progress", "label": "进度条  Progress", "w": 180, "h": 26, "text": ""},
+        {"kind": "slider", "label": "滑块  Slider", "w": 180, "h": 34, "text": ""},
+        {"kind": "table", "label": "表格  Table", "w": 320, "h": 170, "text": ""},
+        {"kind": "tree", "label": "树  Tree", "w": 220, "h": 200, "text": ""}
+    ]
+
+func clamp(v, lo, hi):
+    if v < lo:
+        return lo
+    if v > hi:
+        return hi
+    return v
+
+func in_rect(mx, my, x, y, w, h):
+    return mx >= x and mx <= x + w and my >= y and my <= y + h
+
+func cut(s, n):
+    s = str(s)
+    if len(s) <= n:
+        return s
+    return substr(s, 0, n) + "..."
+
+func numstr(v):
+    if v == int(v):
+        return str(int(v))
+    return str(v)
+
+func esc(s):
+    return json_encode(str(s))
+
+func kind_spec(kind):
+    for p in palette:
+        if p["kind"] == kind:
+            return p
+    return palette[0]
+
+func kind_color(kind):
+    if kind == "button":
+        return "#2563EB"
+    if kind == "edit":
+        return "#334155"
+    if kind == "checkbox" or kind == "radio":
+        return "#0EA5E9"
+    if kind == "listbox" or kind == "combo":
+        return "#0D9488"
+    if kind == "progress" or kind == "slider":
+        return "#CA8A04"
+    if kind == "table":
+        return "#7C3AED"
+    if kind == "tree":
+        return "#059669"
+    if kind == "label":
+        return "#475569"
+    return "#64748B"
+
+func default_items():
+    return ["选项 1", "选项 2", "选项 3"]
+
+func id_exists(id):
+    for w in widgets:
+        if w["id"] == id:
+            return true
+    return false
+
+func new_widget_id(kind):
+    id = kind + "_" + str(next_id)
+    while id_exists(id):
+        next_id += 1
+        id = kind + "_" + str(next_id)
+    next_id += 1
+    return id
+
+func refresh_title():
+    t = "Agui 设计器"
+    if current_path != "":
+        t = t + "  -  " + current_path
+    if dirty:
+        t = t + " *"
+    win.title = t
+
+func set_status(msg):
+    status_msg = msg
+    draw_all()
+
+func add_widget(kind, x, y):
+    spec = kind_spec(kind)
+    ww = spec["w"]
+    hh = spec["h"]
+    x = clamp(x, 0, DESIGN_W - ww)
+    y = clamp(y, 0, DESIGN_H - hh)
+    rec = {
+        "id": new_widget_id(kind),
+        "kind": kind,
+        "text": spec["text"],
+        "x": x,
+        "y": y,
+        "w": ww,
+        "h": hh,
+        "checked": false,
+        "items": default_items(),
+        "fg": "",
+        "bg": ""
+    }
+    widgets.append(rec)
+    selected = len(widgets) - 1
+    dirty = true
+    refresh_title()
+    return rec
+
+func draw_palette():
+    c.rect(PAL_X, PAL_Y, PAL_W, CANVAS_H - 20, color="#111C31", fill=true)
+    c.rect(PAL_X, PAL_Y, PAL_W, CANVAS_H - 20, color="#24324D", fill=false)
+    c.text(PAL_X + 12, PAL_Y + 10, "控件库", color="#E2E8F0", size=14)
+    c.text(PAL_X + 12, PAL_Y + 28, "按住拖到设计区", color="#64748B", size=10)
+    for i in range(len(palette)):
+        p = palette[i]
+        y = PAL_Y + PAL_TOP + i * PAL_ROW
+        hi = drag_mode == "new" and drag_kind == p["kind"]
+        bg = "#18253C"
+        if hi:
+            bg = "#1D4ED8"
+        c.rect(PAL_X + 8, y, PAL_W - 16, 28, color=bg, fill=true)
+        c.rect(PAL_X + 8, y, PAL_W - 16, 28, color="#2B3B57", fill=false)
+        c.rect(PAL_X + 14, y + 9, 10, 10, color=kind_color(p["kind"]), fill=true)
+        c.text(PAL_X + 30, y + 6, p["label"], color="#DCE6F5", size=11)
+
+func draw_grid():
+    c.rect(DES_X + 10, DES_Y + 10, DESIGN_W, DESIGN_H, color=design["bg"], fill=true)
+    c.rect(DES_X + 10, DES_Y + 10, DESIGN_W, DESIGN_H, color="#3B4B68", fill=false)
+    for x in range(0, DESIGN_W + 1, 20):
+        c.line(DES_X + 10 + x, DES_Y + 10, DES_X + 10 + x, DES_Y + 10 + DESIGN_H, color="#17243A", width=1)
+    for y in range(0, DESIGN_H + 1, 20):
+        c.line(DES_X + 10, DES_Y + 10 + y, DES_X + 10 + DESIGN_W, DES_Y + 10 + y, color="#17243A", width=1)
+    c.text(DES_X + 14, DES_Y + 16, str(int(design["width"])) + " x " + str(int(design["height"])), color="#475569", size=10)
+
+func draw_widget(w, i):
+    wx = DES_X + 10 + w["x"]
+    wy = DES_Y + 10 + w["y"]
+    ww = w["w"]
+    hh = w["h"]
+    col = kind_color(w["kind"])
+    c.rect(wx, wy, ww, hh, color=col, fill=true)
+    c.rect(wx, wy, ww, hh, color="#0B1220", fill=false, width=2)
+    c.text(wx + 5, wy + 3, cut(w["id"], 12), color="#F8FAFC", size=9)
+    label = w["text"]
+    if label == "":
+        label = w["kind"]
+    c.text(wx + 5, wy + 16, cut(label, 24), color="#F8FAFC", size=10)
+    if i == selected:
+        c.rect(wx - 2, wy - 2, ww + 4, hh + 4, color="#FBBF24", fill=false, width=2)
+        c.rect(wx + ww - 4, wy + hh - 4, 8, 8, color="#FBBF24", fill=true)
+
+func draw_design():
+    c.rect(DES_X, DES_Y, DES_W, DES_H, color="#0B1220", fill=true)
+    c.rect(DES_X, DES_Y, DES_W, DES_H, color="#26344E", fill=false)
+    draw_grid()
+    for i in range(len(widgets)):
+        draw_widget(widgets[i], i)
+    if drag_mode == "new" and drag_kind != "":
+        spec = kind_spec(drag_kind)
+        mx = c.mouse_x - spec["w"] / 2
+        my = c.mouse_y - spec["h"] / 2
+        c.rect(mx, my, spec["w"], spec["h"], color=kind_color(drag_kind), fill=true)
+        c.rect(mx, my, spec["w"], spec["h"], color="#FBBF24", fill=false, width=2)
+
+func draw_inspector():
+    c.rect(INS_X, PAL_Y, INS_W, CANVAS_H - 20, color="#111C31", fill=true)
+    c.rect(INS_X, PAL_Y, INS_W, CANVAS_H - 20, color="#24324D", fill=false)
+    c.text(INS_X + 12, PAL_Y + 10, "属性 / 事件", color="#E2E8F0", size=14)
+    if selected < 0 or selected >= len(widgets):
+        c.text(INS_X + 12, PAL_Y + 38, "未选中控件", color="#64748B", size=11)
+        c.text(INS_X + 12, PAL_Y + 60, "1. 从左侧拖入控件", color="#94A3B8", size=10)
+        c.text(INS_X + 12, PAL_Y + 78, "2. 点击设计区选中", color="#94A3B8", size=10)
+        c.text(INS_X + 12, PAL_Y + 96, "3. 拖动移动 / 右下角缩放", color="#94A3B8", size=10)
+        c.text(INS_X + 12, PAL_Y + 114, "4. 顶部按钮改文本/绑定事件", color="#94A3B8", size=10)
+        return
+    w = widgets[selected]
+    y = PAL_Y + 38
+    c.text(INS_X + 12, y, w["id"], color="#FBBF24", size=13)
+    y += 22
+    c.text(INS_X + 12, y, "类型  " + w["kind"], color="#CBD5E1", size=10)
+    y += 20
+    c.text(INS_X + 12, y, "位置  " + numstr(w["x"]) + ", " + numstr(w["y"]), color="#CBD5E1", size=10)
+    y += 18
+    c.text(INS_X + 12, y, "尺寸  " + numstr(w["w"]) + " x " + numstr(w["h"]), color="#CBD5E1", size=10)
+    y += 18
+    c.text(INS_X + 12, y, "文本  " + cut(w["text"], 22), color="#CBD5E1", size=10)
+    y += 24
+    c.text(INS_X + 12, y, "已绑定事件", color="#94A3B8", size=10)
+    y += 18
+    id = w["id"]
+    if id in events:
+        if len(events[id]) == 0:
+            c.text(INS_X + 12, y, "（无）", color="#64748B", size=10)
+        for ev in events[id]:
+            code = str(events[id][ev])
+            c.text(INS_X + 12, y, ev + "  ->  " + cut(code, 18), color="#7DD3FC", size=10)
+            y += 17
+    else:
+        c.text(INS_X + 12, y, "（无）", color="#64748B", size=10)
+    c.text(INS_X + 12, CANVAS_H - 74, "快捷键：Delete 删除", color="#64748B", size=9)
+    c.text(INS_X + 12, CANVAS_H - 58, "方向键移动，Ctrl+S 保存", color="#64748B", size=9)
+    c.text(INS_X + 12, CANVAS_H - 42, "Shift+方向键快速移动", color="#64748B", size=9)
+
+func draw_status():
+    c.rect(0, CANVAS_H - 24, CANVAS_W, 24, color="#0E1728", fill=true)
+    c.text(10, CANVAS_H - 20, status_msg, color="#94A3B8", size=10)
+
+func draw_all():
+    c.batch_begin()
+    c.clear()
+    c.rect(0, 0, CANVAS_W, CANVAS_H, color="#0B1220", fill=true)
+    draw_palette()
+    draw_design()
+    draw_inspector()
+    draw_status()
+    c.batch_end()
+
+func selected_widget():
+    if selected < 0 or selected >= len(widgets):
+        return null
+    return widgets[selected]
+
+func edit_text():
+    w = selected_widget()
+    if w == null:
+        set_status("请先选中一个控件")
+        return
+    v = input("控件文本", default=w["text"])
+    if v == null:
+        return
+    w["text"] = str(v)
+    dirty = true
+    refresh_title()
+    draw_all()
+
+func edit_geometry():
+    w = selected_widget()
+    if w == null:
+        set_status("请先选中一个控件")
+        return
+    vx = input("X 坐标", default=numstr(w["x"]))
+    if vx == null:
+        return
+    vy = input("Y 坐标", default=numstr(w["y"]))
+    if vy == null:
+        return
+    vw = input("宽度", default=numstr(w["w"]))
+    if vw == null:
+        return
+    vh = input("高度", default=numstr(w["h"]))
+    if vh == null:
+        return
+    nw = num(vw)
+    nh = num(vh)
+    if nw < 20:
+        nw = 20
+    if nh < 20:
+        nh = 20
+    w["x"] = clamp(num(vx), 0, DESIGN_W - nw)
+    w["y"] = clamp(num(vy), 0, DESIGN_H - nh)
+    w["w"] = clamp(nw, 20, DESIGN_W - w["x"])
+    w["h"] = clamp(nh, 20, DESIGN_H - w["y"])
+    dirty = true
+    refresh_title()
+    draw_all()
+
+func default_event(kind):
+    if kind == "button":
+        return "click"
+    if kind == "edit" or kind == "checkbox" or kind == "radio" or kind == "combo" or kind == "listbox":
+        return "change"
+    if kind == "table" or kind == "tree":
+        return "select"
+    return "click"
+
+func bind_event():
+    w = selected_widget()
+    if w == null:
+        set_status("请先选中一个控件")
+        return
+    id = w["id"]
+    ev = input("事件名（click/change/select/dblclick）", default=default_event(w["kind"]))
+    if ev == null:
+        return
+    ev = trim(str(ev))
+    if ev == "":
+        return
+    old = ""
+    if id in events:
+        if ev in events[id]:
+            old = str(events[id][ev])
+    code = input("处理代码（一行；多条用 ;; 分隔）", default=old)
+    if code == null:
+        return
+    if not (id in events):
+        events[id] = {}
+    events[id][ev] = str(code)
+    dirty = true
+    refresh_title()
+    set_status("已绑定 " + id + "." + ev)
+
+func delete_selected():
+    if selected < 0 or selected >= len(widgets):
+        set_status("请先选中一个控件")
+        return
+    w = widgets[selected]
+    id = w["id"]
+    if id in events:
+        events.remove(id)
+    widgets.pop(selected)
+    selected = -1
+    dirty = true
+    refresh_title()
+    draw_all()
+
+func move_selected(dx, dy):
+    w = selected_widget()
+    if w == null:
+        return
+    w["x"] = clamp(w["x"] + dx, 0, DESIGN_W - w["w"])
+    w["y"] = clamp(w["y"] + dy, 0, DESIGN_H - w["h"])
+    dirty = true
+    refresh_title()
+    draw_all()
+
+func raise_selected():
+    if selected < 0 or selected >= len(widgets) - 1:
+        return
+    tmp = widgets[selected]
+    widgets[selected] = widgets[selected + 1]
+    widgets[selected + 1] = tmp
+    selected += 1
+    dirty = true
+    draw_all()
+
+func lower_selected():
+    if selected <= 0:
+        return
+    tmp = widgets[selected]
+    widgets[selected] = widgets[selected - 1]
+    widgets[selected - 1] = tmp
+    selected -= 1
+    dirty = true
+    draw_all()
+
+func new_document():
+    design = {"title": "未命名窗口", "width": DESIGN_W, "height": DESIGN_H, "bg": "#0F172A"}
+    widgets = []
+    events = {}
+    selected = -1
+    current_path = ""
+    dirty = false
+    next_id = 1
+    refresh_title()
+    set_status("已新建设计")
+
+func layout_payload():
+    return json_encode({"version": 1, "design": design, "widgets": widgets, "events": events})
+
+func gen_widget(w):
+    k = w["kind"]
+    line = w["id"] + " = " + k + "("
+    if k == "table":
+        line = line + '["列 1", "列 2"], []'
+    elif k == "tree":
+        line = line + '["根节点", [["子节点", []]]]'
+    else:
+        line = line + esc(w["text"])
+    line = line + ", x=" + numstr(w["x"]) + ", y=" + numstr(w["y"])
+    line = line + ", w=" + numstr(w["w"]) + ", h=" + numstr(w["h"])
+    if k == "checkbox" or k == "radio":
+        if w["checked"]:
+            line = line + ", checked=true"
+        else:
+            line = line + ", checked=false"
+    if k == "listbox" or k == "combo":
+        parts = []
+        for it in w["items"]:
+            parts.append(esc(it))
+        line = line + ", items=[" + join(parts, ", ") + "]"
+    if k == "progress" or k == "slider":
+        line = line + ", value=50"
+    if w["fg"] != "":
+        line = line + ", fg=" + esc(w["fg"])
+    if w["bg"] != "":
+        line = line + ", bg=" + esc(w["bg"])
+    line = line + ")"
+    return line
+
+func generate_code():
+    out = []
+    out.append("# @agui-designer v1")
+    out.append("# @agui-layout " + layout_payload())
+    out.append("# 由 Agui 可视化设计器生成；可再次用 agui designer 打开。")
+    out.append("")
+    out.append("win = window(" + esc(design["title"]) + ", " + numstr(design["width"]) + ", " + numstr(design["height"]) + ", bg=" + esc(design["bg"]) + ")")
+    out.append("")
+    for w in widgets:
+        out.append(gen_widget(w))
+    out.append("")
+    for id in events:
+        if id_exists(id):
+            for ev in events[id]:
+                code = str(events[id][ev])
+                if code != "":
+                    out.append("on " + id + "." + ev + ":")
+                    for part in code.split(";;"):
+                        p = trim(part)
+                        if p != "":
+                            out.append("    " + p)
+                    out.append("")
+    out.append("")
+    return join(out, "\n")
+
+func load_text(text):
+    payload = ""
+    for line in text.split("\n"):
+        line = trim(line)
+        if startswith(line, "# @agui-layout "):
+            payload = substr(line, 15, len(line) - 15)
+    if payload == "":
+        msgbox("这个文件没有设计器布局元数据，无法以图形方式打开。", title="Agui 设计器")
+        return false
+    data = json_decode(payload)
+    if type(data) != "map":
+        msgbox("布局元数据格式错误。", title="Agui 设计器")
+        return false
+    design = data["design"]
+    widgets = data["widgets"]
+    events = data["events"]
+    if type(events) != "map":
+        events = {}
+    selected = -1
+    dirty = false
+    next_id = len(widgets) + 1
+    return true
+
+func open_document():
+    path = open_file("Agui 设计|*.ag|所有文件|*.*")
+    if path == null:
+        return
+    text = read_file(path)
+    if load_text(text):
+        current_path = path
+        refresh_title()
+        set_status("已打开 " + path)
+
+func save_as():
+    path = save_file("Agui 设计|*.ag", default="design.ag")
+    if path == null:
+        return false
+    write_file(path, generate_code())
+    current_path = path
+    dirty = false
+    refresh_title()
+    set_status("已保存 " + path)
+    return true
+
+func save_document():
+    if current_path == "":
+        save_as()
+        return
+    write_file(current_path, generate_code())
+    dirty = false
+    refresh_title()
+    set_status("已保存 " + current_path)
+
+func export_document():
+    path = save_file("Agui 脚本|*.ag", default="app.ag")
+    if path == null:
+        return
+    write_file(path, generate_code())
+    set_status("已导出 " + path)
+
+func select_at(lx, ly):
+    hit = -1
+    for i in range(len(widgets)):
+        idx = len(widgets) - 1 - i
+        w = widgets[idx]
+        if lx >= w["x"] and lx <= w["x"] + w["w"] and ly >= w["y"] and ly <= w["y"] + w["h"]:
+            hit = idx
+            break
+    selected = hit
+    return hit
+
+palette = init_palette()
+win = window("Agui 设计器", 1200, 800, bg="#0B1220", center=true)
+c = canvas(x=12, y=58, w=CANVAS_W, h=CANVAS_H)
+
+btn_new = button("新建", x=12, y=12, w=64, h=32)
+btn_open = button("打开", x=84, y=12, w=64, h=32)
+btn_save = button("保存", x=156, y=12, w=64, h=32)
+btn_export = button("导出", x=228, y=12, w=64, h=32)
+btn_text = button("文本", x=308, y=12, w=64, h=32)
+btn_geom = button("位置", x=380, y=12, w=64, h=32)
+btn_event = button("事件", x=452, y=12, w=64, h=32)
+btn_del = button("删除", x=524, y=12, w=64, h=32)
+btn_up = button("上移", x=596, y=12, w=64, h=32)
+btn_down = button("下移", x=668, y=12, w=64, h=32)
+tips = label("拖拽控件 → 选中 → 改文本/绑定事件 → 保存或导出", x=748, y=18, w=420, h=24, fg="#94A3B8")
+
+on btn_new.click:
+    new_document()
+
+on btn_open.click:
+    open_document()
+
+on btn_save.click:
+    save_document()
+
+on btn_export.click:
+    export_document()
+
+on btn_text.click:
+    edit_text()
+
+on btn_geom.click:
+    edit_geometry()
+
+on btn_event.click:
+    bind_event()
+
+on btn_del.click:
+    delete_selected()
+
+on btn_up.click:
+    raise_selected()
+
+on btn_down.click:
+    lower_selected()
+
+on c.mousedown:
+    if c.mouse_button == "left":
+        mx = c.mouse_x
+        my = c.mouse_y
+        if in_rect(mx, my, PAL_X, PAL_Y + PAL_TOP, PAL_W, len(palette) * PAL_ROW):
+            idx = int((my - PAL_Y - PAL_TOP) / PAL_ROW)
+            if idx >= 0 and idx < len(palette):
+                drag_kind = palette[idx]["kind"]
+                drag_mode = "new"
+                draw_all()
+        elif mx >= DES_X + 10 and mx <= DES_X + 10 + DESIGN_W and my >= DES_Y + 10 and my <= DES_Y + 10 + DESIGN_H:
+            lx = mx - DES_X - 10
+            ly = my - DES_Y - 10
+            hit = select_at(lx, ly)
+            if hit >= 0:
+                w = widgets[hit]
+                if lx >= w["x"] + w["w"] - 10 and ly >= w["y"] + w["h"] - 10:
+                    drag_mode = "resize"
+                else:
+                    drag_mode = "move"
+                    drag_dx = lx - w["x"]
+                    drag_dy = ly - w["y"]
+            draw_all()
+
+on c.mousemove:
+    if drag_mode == "new":
+        draw_all()
+    elif drag_mode == "move" and selected >= 0:
+        w = widgets[selected]
+        lx = c.mouse_x - DES_X - 10
+        ly = c.mouse_y - DES_Y - 10
+        w["x"] = clamp(lx - drag_dx, 0, DESIGN_W - w["w"])
+        w["y"] = clamp(ly - drag_dy, 0, DESIGN_H - w["h"])
+        draw_all()
+    elif drag_mode == "resize" and selected >= 0:
+        w = widgets[selected]
+        lx = c.mouse_x - DES_X - 10
+        ly = c.mouse_y - DES_Y - 10
+        w["w"] = clamp(lx - w["x"], 20, DESIGN_W - w["x"])
+        w["h"] = clamp(ly - w["y"], 20, DESIGN_H - w["y"])
+        draw_all()
+
+on c.mouseup:
+    if drag_mode == "new" and drag_kind != "":
+        mx = c.mouse_x
+        my = c.mouse_y
+        if mx >= DES_X + 10 and mx <= DES_X + 10 + DESIGN_W and my >= DES_Y + 10 and my <= DES_Y + 10 + DESIGN_H:
+            spec = kind_spec(drag_kind)
+            add_widget(drag_kind, mx - DES_X - 10 - spec["w"] / 2, my - DES_Y - 10 - spec["h"] / 2)
+    drag_mode = ""
+    drag_kind = ""
+    draw_all()
+
+on win.keydown:
+    k = win.key
+    if key_down("ctrl") and k == "s":
+        save_document()
+    elif key_down("ctrl") and k == "o":
+        open_document()
+    elif k == "delete":
+        delete_selected()
+    elif k == "left":
+        if key_down("shift"):
+            move_selected(-10, 0)
+        else:
+            move_selected(-1, 0)
+    elif k == "right":
+        if key_down("shift"):
+            move_selected(10, 0)
+        else:
+            move_selected(1, 0)
+    elif k == "up":
+        if key_down("shift"):
+            move_selected(0, -10)
+        else:
+            move_selected(0, -1)
+    elif k == "down":
+        if key_down("shift"):
+            move_selected(0, 10)
+        else:
+            move_selected(0, 1)
+
+refresh_title()
+
+if len(args) > 0:
+    p = str(args[0])
+    if file_exists(p):
+        if load_text(read_file(p)):
+            current_path = p
+            refresh_title()
+            set_status("已打开 " + p)
+
+draw_all()
