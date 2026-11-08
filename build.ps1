@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+#requires -Version 5.1
 <#
 .SYNOPSIS
     构建 Agui 解释器。
@@ -17,7 +17,7 @@ $ErrorActionPreference = 'Stop'
 Push-Location $PSScriptRoot
 try {
     if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
-        throw '没有找到 go，请先安装 Go 1.22+ 并加入 PATH。'
+        throw '没有找到 go，请先安装 Go 1.26+ 并加入 PATH。'
     }
 
     if ($Test) {

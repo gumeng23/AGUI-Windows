@@ -1,6 +1,28 @@
 # Agui：为 Windows GUI 而生的解释型语言
 
+[![Release](https://img.shields.io/github/v/release/gumeng23/AGUI-Windows?label=release)](https://github.com/gumeng23/AGUI-Windows/releases/latest)
+[![License](https://img.shields.io/github/license/gumeng23/AGUI-Windows)](LICENSE)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android-0078D4)
+
 Agui 是一门轻量、解释执行的脚本语言。它用接近 Python 的缩进语法，直接创建**原生 Windows 控件**，也能把同一份脚本构建成 **原生 Android 应用**；不需要 Electron、浏览器或额外运行时。解释器本身由 Go 写成，Windows 侧直调 Win32 API，Android 侧经 gomobile 调原生 View。当前版本 **0.9.1**。
+
+## 下载即用
+
+不想装任何东西：下载、解压，即可运行（绿色版，不写注册表）。
+
+1. **下载** [Agui-0.9.1-win64.zip](https://github.com/gumeng23/AGUI-Windows/releases/latest)（约 14 MB，含 `agui.exe`、`aguiw.exe`、全部示例与文档）
+2. **解压**到任意目录 —— 绿色版，不写注册表，不需要管理员权限
+3. 在该目录打开 PowerShell，三条命令：
+
+```powershell
+.\agui.exe check examples\hello.ag                # 1. 只检查语法，不弹窗
+.\agui.exe run   examples\hello.ag                # 2. 运行脚本，窗口立刻出来
+.\agui.exe build examples\hello.ag -o hello.exe   # 3. 打包成约 12 MB 的单文件 exe
+```
+
+`hello.exe` 可以直接发给别人双击运行：不需要 .NET，不需要浏览器，目标机器也不需要装任何运行时。
+
+想从零建一个项目：`.\agui.exe init 我的工具`。
 
 ![Agui 窗口示例](docs/images/hello.png)
 
@@ -43,7 +65,7 @@ on win.close:
 - **内置实用库**：消息框、文件对话框、文件读写、剪贴板（文本/图片）、定时器、截图、JSON、base64、HTTP、WebSocket。
 - **二进制与数据**：独立 `bytes` 类型、SQLite（系统 `winsqlite3.dll`）、WAV 播放、包管理器 `agui install/list/remove`。
 - **更多控件**：groupbox、treeview、canvas（鼠标事件）、可编辑/可排序表格、菜单快捷键与图标、文件拖放、radio、状态栏、日期/时间选择器、tooltip、系统托盘。
-- **无第三方依赖**：只用 Go 标准库和系统 DLL。
+- **依赖极少**：Windows 侧只用 Go 标准库和系统 DLL；只有 Android 构建会引入 `golang.org/x/mobile`（gomobile），运行时依然零依赖。
 
 | 计数器 | 表单 |
 | --- | --- |
@@ -51,11 +73,13 @@ on win.close:
 
 ---
 
-## 快速开始
+## 从源码构建
+
+只想用、不想改代码，跳过本节 —— 直接下载上面的 Release 包即可。
 
 ### 1. 构建解释器
 
-需要 Windows 10/11 和 Go 1.22+（本项目使用 Go 1.26 验证）。在项目根目录运行：
+需要 Windows 10/11 和 Go 1.26+（`go.mod` 声明 `go 1.26.0`）。在项目根目录运行：
 
 ```powershell
 .\build.bat
@@ -163,7 +187,7 @@ on rest.click:
 - 文件与权限：选择结果走窗口 `file` 事件 / `win.file`；权限结果走窗口 `permission` 事件 / `win.permission_granted`。
 - 生命周期：`onPause/onResume` 会转发到解释器，Android 返回键触发窗口 `close` 事件。
 
-**限制**：当前环境没有 Android 真机/模拟器，APK 已通过 `aapt2 badging`、`apksigner verify` 和 dex/native 结构检查，但安装启动仍需设备验证。Android 端不支持的控件（menu/tray/table/tree/canvas/Game Kit 等）不会静默降级，运行时会报未定义函数；构建期白名单校验是后续工作。旧 WebView 实验代码仍保留在 `cmd/aguiweb`、`internal/webui`、`web/`，不再是默认路线。
+**限制**：APK 已通过 `aapt2 badging`、`apksigner verify` 与 dex/native 结构检查，但还没有在真机或模拟器上跑过，安装启动验证待补。Android 端已支持 `window/panel/label/button/edit/checkbox/progress/image/canvas` 与 Game Kit 的 `game_loop/camera/aabb/save_json` 子集；未移植的是 `menu/tray/table/tree/richedit` 等 Windows 专属控件，调用时直接报未定义函数，不会静默降级，构建期白名单校验是后续工作。旧 WebView 代码（`cmd/aguiweb`、`internal/webui`、`web/`）只保留做浏览器调试，不再是默认路线。
 
 ---
 
@@ -850,9 +874,11 @@ agui/
 ├─ packages/            安装的第三方 .ag 包
 ├─ assets/              示例图片、图标和音频
 ├─ scripts/sign.ps1     本机自签名脚本
+├─ scripts/pack_release.ps1  打包 Windows Release（白名单，不含内部文档）
 ├─ scripts/ws_echo.py   WebSocket 回显示例服务
 ├─ docs/language.md     语言与 GUI API 参考
 ├─ docs/signing.md      代码签名说明
+├─ .github/workflows/   GitHub Pages 构建（WASM 版在线示例）
 ├─ build.bat            免 ExecutionPolicy 的构建入口
 └─ build.ps1            一键构建 agui.exe + aguiw.exe
 ```

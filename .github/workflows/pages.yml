@@ -1,0 +1,52 @@
+name: Pages
+
+# 把 web/ 目录（WASM 版《星野养成》）发布到 GitHub Pages，
+# README 首屏的「在线示例」链接指向这里。
+# 首次使用：Settings → Pages → Source 选 "GitHub Actions"。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Build WebAssembly interpreter
+        run: |
+          GOOS=js GOARCH=wasm go build -trimpath -o web/agui.wasm ./cmd/aguiweb
+          # wasm_exec.js 必须与构建用的 Go 版本一致，每次从 GOROOT 取
+          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/wasm_exec.js
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
