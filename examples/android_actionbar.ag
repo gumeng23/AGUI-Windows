@@ -116,6 +116,16 @@ on savebtn.click:
 on win.saved:
     status.text = "已保存：" + win.saved
 
+pg = pager()
+pg1 = pg.add_page("第一页")
+label("左右滑动可以翻页", parent=pg1)
+pg2 = pg.add_page("第二页")
+label("这是第二页", parent=pg2)
+goto2 = button("切到第二页", w=160, parent=pg1)
+on goto2.click:
+    pg.active = 1
+    status.text = "Page 2"
+
 button("返回", w=120)
 on win.close:
     toast("再见")

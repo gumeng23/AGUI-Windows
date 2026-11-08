@@ -26,6 +26,7 @@ type Bridge interface {
 	SetImage(id int, src string)
 	SetStyle(id int, fg string, size int)
 	SetVisible(id int, visible bool)
+	SetPager(id int, index int)
 	SetEnabled(id int, enabled bool)
 	Toast(text string)
 	Alert(title string, message string)
@@ -419,16 +420,16 @@ func (w *Widget) CallMethod(name string, args []lang.Value, kwargs map[string]la
 		item := w.app.addWidget(w.id, "action", lang.ToString(args[0]), 15, "#FFFFFF")
 		return item, true, nil
 	case "add_page":
-		if w.kind != "tabs" {
-			return nil, true, fmt.Errorf("add_page 只能用于 tabs")
+		if w.kind != "tabs" && w.kind != "pager" {
+			return nil, true, fmt.Errorf("add_page 只能用于 tabs/pager")
 		}
 		if len(args) < 1 {
 			return nil, true, fmt.Errorf("add_page 需要标题")
 		}
 		return w.addTabPage(lang.ToString(args[0])), true, nil
 	case "activate_tab":
-		if w.kind != "tabs" {
-			return nil, true, fmt.Errorf("activate_tab 只能用于 tabs")
+		if w.kind != "tabs" && w.kind != "pager" {
+			return nil, true, fmt.Errorf("activate_tab 只能用于 tabs/pager")
 		}
 		if len(args) < 1 {
 			return nil, true, fmt.Errorf("activate_tab 需要索引")
@@ -439,6 +440,12 @@ func (w *Widget) CallMethod(name string, args []lang.Value, kwargs map[string]la
 }
 
 func (w *Widget) addTabPage(title string) *Widget {
+	if w.kind == "pager" {
+		page := w.app.addWidget(w.id, "panel", "", 16, "")
+		w.tabPages = append(w.tabPages, page)
+		w.activeTab = 0
+		return page
+	}
 	if w.tabHeader == nil {
 		w.tabHeader = w.app.addWidget(w.id, "row", "", 16, "")
 	}
@@ -458,6 +465,11 @@ func (w *Widget) addTabPage(title string) *Widget {
 func (w *Widget) activateTab(i int) error {
 	if i < 0 || i >= len(w.tabPages) {
 		return fmt.Errorf("标签页索引越界：%d", i)
+	}
+	if w.kind == "pager" {
+		w.activeTab = i
+		w.app.bridge.SetPager(w.id, i)
+		return nil
 	}
 	for n, p := range w.tabPages {
 		_ = p.SetProp("visible", n == i)
@@ -513,6 +525,20 @@ func DispatchClick(id int) {
 	}
 	if w := a.get(id); w != nil {
 		w.emit("click")
+	}
+}
+
+// DispatchPager is called by Java after a horizontal swipe.
+func DispatchPager(id int, index int) {
+	currentMu.Lock()
+	a := current
+	currentMu.Unlock()
+	if a == nil {
+		return
+	}
+	if w := a.get(id); w != nil && w.kind == "pager" {
+		w.activeTab = index
+		w.emit("change")
 	}
 }
 

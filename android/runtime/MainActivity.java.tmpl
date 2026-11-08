@@ -37,9 +37,11 @@ import android.text.TextWatcher;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.StyleSpan;
 import android.view.Gravity;
+import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ViewFlipper;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -235,6 +237,26 @@ public class MainActivity extends Activity implements Bridge {
                     LinearLayout box = new LinearLayout(MainActivity.this);
                     box.setOrientation(LinearLayout.VERTICAL);
                     v = box;
+                } else if ("pager".equals(kind)) {
+                    final ViewFlipper flipper = new ViewFlipper(MainActivity.this);
+                    final GestureDetector detector = new GestureDetector(MainActivity.this,
+                            new GestureDetector.SimpleOnGestureListener() {
+                        @Override public boolean onFling(MotionEvent e1, MotionEvent e2, float vx, float vy) {
+                            if (e1 == null || e2 == null) return false;
+                            float dx = e2.getX() - e1.getX();
+                            if (Math.abs(dx) < 80) return false;
+                            if (dx < 0) flipper.showNext(); else flipper.showPrevious();
+                            Mobile.dispatchPager(id, flipper.getDisplayedChild());
+                            return true;
+                        }
+                    });
+                    flipper.setOnTouchListener(new View.OnTouchListener() {
+                        @Override public boolean onTouch(View view, MotionEvent event) {
+                            detector.onTouchEvent(event);
+                            return false;
+                        }
+                    });
+                    v = flipper;
                 } else if ("tabs".equals(kind) || "tabpage".equals(kind) || "tree".equals(kind)) {
                     LinearLayout box = new LinearLayout(MainActivity.this);
                     box.setOrientation(LinearLayout.VERTICAL);
@@ -331,9 +353,16 @@ public class MainActivity extends Activity implements Bridge {
                 if (parent != 0 && views.get(parent) instanceof ViewGroup) {
                     target = (ViewGroup) views.get(parent);
                 }
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                lp.bottomMargin = dp(10);
+                ViewGroup.LayoutParams lp;
+                if (target instanceof LinearLayout) {
+                    LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                    llp.bottomMargin = dp(10);
+                    lp = llp;
+                } else {
+                    lp = new ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                }
                 target.addView(v, lp);
                 v.setTag(kind);
                 views.put(id, v);
@@ -438,6 +467,17 @@ public class MainActivity extends Activity implements Bridge {
             @Override public void run() {
                 View v = views.get(id);
                 if (v != null) v.setVisibility(visible ? View.VISIBLE : View.GONE);
+            }
+        });
+    }
+
+    @Override public void setPager(final long id, final long index) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                View v = views.get(id);
+                if (v instanceof ViewFlipper) {
+                    ((ViewFlipper) v).setDisplayedChild((int) index);
+                }
             }
         });
     }

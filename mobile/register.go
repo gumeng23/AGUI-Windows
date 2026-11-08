@@ -51,6 +51,15 @@ func registerUI(i *lang.Interp, a *App) {
 		return w, nil
 	})
 
+	reg("pager", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("pager", args, 0, 0); err != nil {
+			return nil, err
+		}
+		w := a.addWidget(parentID(kw), "pager", "", 16, "")
+		applyKw(a, w, kw)
+		return w, nil
+	})
+
 	reg("rich", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
 		if err := argCount("rich", args, 1, 1); err != nil {
 			return nil, err
