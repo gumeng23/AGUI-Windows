@@ -255,7 +255,12 @@ func repackAPK(base, out, dex, lib string) error {
 		if err != nil {
 			return err
 		}
-		h := &zip.FileHeader{Name: f.Name, Method: zip.Deflate}
+		method := uint16(zip.Deflate)
+		if f.Name == "resources.arsc" {
+			// Android 11+ rejects compressed resources.arsc for targetSdk >= 30.
+			method = zip.Store
+		}
+		h := &zip.FileHeader{Name: f.Name, Method: method}
 		h.SetMode(f.Mode())
 		ww, err := w.CreateHeader(h)
 		if err != nil {
