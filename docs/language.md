@@ -1452,7 +1452,7 @@ c = canvas(w=400, h=200)
 c.name = "游戏画布"
 ```
 
-普通 Win32 控件（按钮、编辑框、表格等）由系统提供 UIA 名称；自绘的 `canvas`、`image` 通过 `name` 暴露名称，UIA 会显示为 `Pane`。当前没有为自绘控件实现完整的 `IAccessible` 子节点/角色，`canvas` 内部图形仍不能逐个被读屏软件枚举。
+普通 Win32 控件（按钮、编辑框、表格等）由系统提供 UIA 名称；自绘的 `canvas`、`image` 通过 `name` 暴露名称，并在 `WM_GETOBJECT` 中返回标准 MSAA client 对象，UIA 当前显示为 `Pane`。尚未实现自定义 `IAccessible` 子节点和角色枚举，`canvas` 内部图形仍不能逐个被读屏软件枚举。
 
 ### 16.21 HTTP 客户端增强
 

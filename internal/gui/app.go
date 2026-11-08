@@ -863,6 +863,10 @@ func mainWndProc(hwnd, msg, wparam, lparam uintptr) (ret uintptr) {
 		}
 		return 0
 
+	case wmGetObject:
+		if lr := handleGetObject(hwnd, uintptr(wparam)); lr != 0 {
+			return lr
+		}
 	case wmDrawItem:
 		dis := (*drawItemStruct)(unsafe.Pointer(lparam))
 		if dis.ctlType == odtButton {

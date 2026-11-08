@@ -15,6 +15,10 @@ func panelWndProc(hwnd syscall.Handle, msg uint32, wparam, lparam uintptr) uintp
 	}
 	w := a.widgetByHWND(hwnd)
 	switch msg {
+	case wmGetObject:
+		if lr := handleGetObject(uintptr(hwnd), wparam); lr != 0 {
+			return lr
+		}
 	case wmLButtonDown:
 		if w != nil && w.kind == "splitter" {
 			x := int32(int16(lparam & 0xFFFF))

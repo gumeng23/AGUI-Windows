@@ -189,6 +189,10 @@ func imageWndProc(hwnd syscall.Handle, msg uint32, wparam, lparam uintptr) uintp
 	}
 	w := a.widgetByHWND(hwnd)
 	switch msg {
+	case wmGetObject:
+		if lr := handleGetObject(uintptr(hwnd), wparam); lr != 0 {
+			return lr
+		}
 	case wmPaint:
 		var ps paintStruct
 		hdc, _, _ := pBeginPaint.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&ps)))
