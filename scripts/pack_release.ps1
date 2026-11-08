@@ -8,7 +8,7 @@
 .EXAMPLE
     .\scripts\pack_release.ps1
 .EXAMPLE
-    .\scripts\pack_release.ps1 -Version 0.9.2
+    .\scripts\pack_release.ps1 -Version 0.9.3
 #>
 param(
     [string]$Version = ''
@@ -25,7 +25,7 @@ try {
         if ($LASTEXITCODE -eq 0 -and $tag) { $Version = ($tag -replace '^v', '').Trim() }
     }
     if (-not $Version) {
-        throw '无法确定版本号（没有 git tag），请用 -Version 指定，例如 -Version 0.9.2。'
+        throw '无法确定版本号（没有 git tag），请用 -Version 指定，例如 -Version 0.9.3。'
     }
 
     $outDir = Join-Path $root 'build\release'

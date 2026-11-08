@@ -1,7 +1,7 @@
 #target android
 #name Agui 原生控件
 #package com.agui.actionbar
-#version 0.9.2
+#version 0.9.3
 #permission android.permission.VIBRATE android.permission.POST_NOTIFICATIONS android.permission.CAMERA android.permission.RECORD_AUDIO android.permission.ACCESS_FINE_LOCATION android.permission.FOREGROUND_SERVICE android.permission.FOREGROUND_SERVICE_DATA_SYNC
 
 win = window("Agui 原生控件")

@@ -4,13 +4,13 @@
 [![License](https://img.shields.io/github/license/gumeng23/AGUI-Windows)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android-0078D4)
 
-Agui 是一门轻量、解释执行的脚本语言。它用接近 Python 的缩进语法，直接创建**原生 Windows 控件**，也能把同一份脚本构建成 **原生 Android 应用**；不需要 Electron、浏览器或额外运行时。解释器本身由 Go 写成，Windows 侧直调 Win32 API，Android 侧经 gomobile 调原生 View。当前版本 **0.9.2**。
+Agui 是一门轻量、解释执行的脚本语言。它用接近 Python 的缩进语法，直接创建**原生 Windows 控件**，也能把同一份脚本构建成 **原生 Android 应用**；不需要 Electron、浏览器或额外运行时。解释器本身由 Go 写成，Windows 侧直调 Win32 API，Android 侧经 gomobile 调原生 View。当前版本 **0.9.3**。
 
 ## 下载即用
 
 不想装任何东西：下载、解压，即可运行（绿色版，不写注册表）。
 
-1. **下载** [Agui-0.9.2-win64.zip](https://github.com/gumeng23/AGUI-Windows/releases/latest)（约 14 MB，含 `agui.exe`、`aguiw.exe`、全部示例与文档）
+1. **下载** [Agui-0.9.3-win64.zip](https://github.com/gumeng23/AGUI-Windows/releases/latest)（约 14 MB，含 `agui.exe`、`aguiw.exe`、全部示例与文档）
 2. **解压**到任意目录 —— 绿色版，不写注册表，不需要管理员权限
 3. 在该目录打开 PowerShell，三条命令：
 
@@ -67,7 +67,7 @@ on win.close:
 - **中文关键字别名**：`如果 / 否则 / 对于 / 在 / 函数 / 返回 / 监听 / 尝试 / 捕获 / 导入 / 匿名` 等可直接使用。
 - **单文件打包**：`agui build app.ag` 把脚本和资源一起塞进 exe，双击即运行；可嵌入图标和版本信息。
 - **内置实用库**：消息框、文件对话框、文件读写、剪贴板（文本/图片）、定时器、截图、JSON、base64、HTTP、WebSocket。
-- **二进制与数据**：独立 `bytes` 类型、SQLite（系统 `winsqlite3.dll`）、WAV 播放、包管理器 `agui install/list/remove`（支持 registry 包名、版本约束、依赖与 SHA-256 校验）。
+- **二进制与数据**：独立 `bytes` 类型、SQLite（系统 `winsqlite3.dll`）、WAV 播放、包管理器 `agui install/list/search/outdated/upgrade/remove`（支持 registry 包名、版本约束、依赖与 SHA-256 校验）。
 - **更多控件**：groupbox、treeview、canvas（鼠标事件）、可编辑/可排序表格、菜单快捷键与图标、文件拖放、radio、状态栏、日期/时间选择器、tooltip、系统托盘。
 - **依赖极少**：Windows 侧只用 Go 标准库和系统 DLL；只有 Android 构建会引入 `golang.org/x/mobile`（gomobile），运行时依然零依赖。
 
