@@ -85,6 +85,11 @@ on perm.click:
     request_permissions("android.permission.CAMERA", "android.permission.RECORD_AUDIO")
     status.text = "已发起权限组请求"
 
+items = []
+for i in range(1000):
+    items.append("列表项 " + str(i))
+listbox = list(items)
+
 richbox = rich("[b]富文本[/b] 支持 [color=#C2410C]颜色[/color] 与 [i]斜体[/i]。")
 
 treeview = tree([["原生 UI", [["ActionBar", []], ["表格", []], ["标签页", []]]], ["系统", [["通知", []], ["保存文件", []]]]])

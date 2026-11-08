@@ -45,6 +45,7 @@ type Bridge interface {
 	StopRecording()
 	Sensor(name string) string
 	SetTable(id int, json string)
+	SetList(id int, json string)
 	Confirm(title string, message string)
 	SaveFile(name string, content string)
 	OpenURL(url string)

@@ -84,6 +84,28 @@ func registerUI(i *lang.Interp, a *App) {
 		return w, nil
 	})
 
+	reg("list", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("list", args, 1, 1); err != nil {
+			return nil, err
+		}
+		w := a.addWidget(parentID(kw), "list", "", 40, "")
+		items, ok := args[0].(*lang.List)
+		if !ok {
+			return nil, fmt.Errorf("list 需要列表参数")
+		}
+		rows := make([]string, 0, items.Len())
+		for _, item := range items.Items {
+			rows = append(rows, lang.ToString(item))
+		}
+		data, err := json.Marshal(rows)
+		if err != nil {
+			return nil, err
+		}
+		a.bridge.SetList(w.id, string(data))
+		applyKw(a, w, kw)
+		return w, nil
+	})
+
 	reg("confirm", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
 		if err := argCount("confirm", args, 1, 2); err != nil {
 			return nil, err
