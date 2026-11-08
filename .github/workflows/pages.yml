@@ -36,6 +36,9 @@ jobs:
           cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/wasm_exec.js
 
       - uses: actions/configure-pages@v5
+        with:
+          # 首次运行时自动启用 Pages（Source = GitHub Actions），省掉手动去设置页点一次
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
