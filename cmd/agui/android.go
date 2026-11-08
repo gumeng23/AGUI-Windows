@@ -165,6 +165,7 @@ func androidManifest(pkg string, info targetInfo, opts buildOptions) string {
         android:label="@string/app_name"
         android:icon="@drawable/icon"
         android:allowBackup="false"
+        android:extractNativeLibs="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name="` + pkg + `.MainActivity"
