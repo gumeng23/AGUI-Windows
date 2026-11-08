@@ -161,6 +161,8 @@ func androidManifest(pkg string, info targetInfo, opts buildOptions) string {
     android:versionCode="` + fmt.Sprint(versionCode(opts)) + `"
     android:versionName="` + xmlEscape(info.Version) + `">
     <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="34" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 ` + perms.String() + `    <application
         android:label="@string/app_name"
         android:icon="@drawable/icon"
@@ -177,7 +179,17 @@ func androidManifest(pkg string, info targetInfo, opts buildOptions) string {
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="agui" />
+            </intent-filter>
         </activity>
+        <service
+            android:name="` + pkg + `.MainActivity$AguiService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>
 `

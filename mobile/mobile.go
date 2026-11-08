@@ -37,6 +37,8 @@ type Bridge interface {
 	PickFile(mime string)
 	RequestPermission(name string)
 	RequestPermissions(names string)
+	Foreground(title string, text string)
+	StopForeground()
 	SetTable(id int, json string)
 	Confirm(title string, message string)
 	SaveFile(name string, content string)
@@ -66,6 +68,7 @@ type App struct {
 	lastPermOK  bool
 	lastConfirm bool
 	lastSaved   string
+	lastIntent  string
 }
 
 // Widget is a native view exposed to Agui.
@@ -312,6 +315,8 @@ func (w *Widget) GetProp(name string) (lang.Value, bool) {
 		return float64(len(w.tabPages)), true
 	case "saved", "saved_file":
 		return w.app.lastSaved, true
+	case "intent", "intent_url":
+		return w.app.lastIntent, true
 	case "selected":
 		if w.kind == "tree" {
 			return float64(w.treeIndex), true
@@ -462,7 +467,7 @@ func (w *Widget) Listen(event string, fn func() error) error {
 		if w.kind != "edit" && w.kind != "checkbox" {
 			return fmt.Errorf("%s 不支持 change 事件", w.kind)
 		}
-	case "close", "file", "permission", "confirm", "saved":
+	case "close", "file", "permission", "confirm", "saved", "intent":
 		if w.kind != "window" {
 			return fmt.Errorf("%s 不支持 %s 事件", w.kind, event)
 		}
@@ -564,6 +569,20 @@ func DispatchSaved(path string) {
 	a.lastSaved = path
 	if w := a.get(a.windowID); w != nil {
 		w.emit("saved")
+	}
+}
+
+// DispatchIntent is called by Java when the activity receives a deep link.
+func DispatchIntent(uri string) {
+	currentMu.Lock()
+	a := current
+	currentMu.Unlock()
+	if a == nil {
+		return
+	}
+	a.lastIntent = uri
+	if w := a.get(a.windowID); w != nil {
+		w.emit("intent")
 	}
 }
 

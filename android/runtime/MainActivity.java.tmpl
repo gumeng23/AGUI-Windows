@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.Service;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -19,6 +20,7 @@ import android.graphics.RectF;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.os.Vibrator;
 import android.text.Editable;
 import android.text.SpannableStringBuilder;
@@ -109,6 +111,16 @@ public class MainActivity extends Activity implements Bridge {
             return;
         }
         Mobile.start(script, this);
+        String deep = getIntent() == null ? null : getIntent().getDataString();
+        if (deep != null) Mobile.dispatchIntent(deep);
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent != null && intent.getDataString() != null) {
+            Mobile.dispatchIntent(intent.getDataString());
+        }
     }
 
     private CharSequence richParse(String s) {
@@ -662,6 +674,52 @@ public class MainActivity extends Activity implements Bridge {
             boolean ok = grantResults != null && i < grantResults.length
                     && grantResults[i] == android.content.pm.PackageManager.PERMISSION_GRANTED;
             Mobile.dispatchPermission(permissions[i], ok);
+        }
+    }
+
+    @Override public void foreground(final String title, final String text) {
+        Intent it = new Intent(this, AguiService.class);
+        it.putExtra("title", title);
+        it.putExtra("text", text);
+        if (Build.VERSION.SDK_INT >= 26) startForegroundService(it); else startService(it);
+    }
+
+    @Override public void stopForeground() {
+        stopService(new Intent(this, AguiService.class));
+    }
+
+    public static class AguiService extends Service {
+        private static final String CHANNEL = "agui_foreground";
+        private String title = "Agui 后台任务";
+        private String text = "正在运行";
+
+        @Override public IBinder onBind(Intent intent) { return null; }
+
+        @Override public int onStartCommand(Intent intent, int flags, int startId) {
+            if (intent != null) {
+                if (intent.getStringExtra("title") != null) title = intent.getStringExtra("title");
+                if (intent.getStringExtra("text") != null) text = intent.getStringExtra("text");
+            }
+            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (Build.VERSION.SDK_INT >= 26) {
+                nm.createNotificationChannel(new NotificationChannel(
+                        CHANNEL, "后台任务", NotificationManager.IMPORTANCE_LOW));
+            }
+            Notification.Builder b = Build.VERSION.SDK_INT >= 26
+                    ? new Notification.Builder(this, CHANNEL)
+                    : new Notification.Builder(this);
+            Notification n = b.setContentTitle(title)
+                    .setContentText(text)
+                    .setSmallIcon(android.R.drawable.stat_sys_download)
+                    .setOngoing(true)
+                    .build();
+            startForeground(1, n);
+            return START_STICKY;
+        }
+
+        @Override public void onDestroy() {
+            stopForeground(true);
+            super.onDestroy();
         }
     }
 

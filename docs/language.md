@@ -1797,6 +1797,8 @@ win = window("星野养成", w=420, h=640)
 - `tree(items)` 在 Android 上用缩进标签模拟树：`[["父节点", [["子节点", []]]]]`，点击节点触发 `select` 事件，`tree.selected` 是扁平索引；不支持展开/折叠和拖拽。
 - `rich("...")` 在 Android 上渲染只读富文本，支持 `[b]粗体[/b]`、`[i]斜体[/i]`、`[color=#RRGGBB]颜色[/color]`；不支持编辑和超链接。
 - `request_permissions("android.permission.CAMERA", "android.permission.RECORD_AUDIO")` 可一次申请一组运行时权限；每个结果通过窗口 `permission` 事件返回，`win.permission_name` / `win.permission_granted` 读取最近一次结果。权限必须在脚本头部用 `#permission` 声明。
+- `foreground(title, text)` / `stop_foreground()` 启动/停止 Android 前台服务，通知栏会显示常驻通知；Android 14 使用 `dataSync` 类型，脚本需声明 `FOREGROUND_SERVICE` 与 `FOREGROUND_SERVICE_DATA_SYNC`。
+- 深链：清单注册 `agui://` scheme；应用收到链接时触发窗口 `intent` 事件，`win.intent` 读取 URL。启动 Activity 时和 `onNewIntent` 都会分发。
 - `confirm(title, message)` 显示确定/取消对话框，结果在窗口 `confirm` 事件中读取 `win.confirm`（true=确定，false=取消）。`alert(title, message)` 只显示信息。
 - `save_file(name, content)` 打开系统“另存为”选择器；保存完成触发窗口 `saved` 事件，`win.saved` 是目标文档 URI。写入使用 SAF，不需要存储权限。
 - 构建 Android 需要 `android/runtime/agui.aar`（由 `gomobile bind ... ./mobile` 生成）以及 SDK/JDK；`--asset` 可把额外资源打进 APK。

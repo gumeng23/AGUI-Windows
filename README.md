@@ -525,6 +525,8 @@ on list.select:
 - **Android 文件保存**：`save_file(name, content)` 走 SAF 创建文档，完成后触发窗口 `saved` 事件并通过 `win.saved` 读取 URI。
 - **Android 基础树**：`tree(items)` 用缩进标签渲染层级，点击节点触发 `select`；不支持展开/折叠。
 - **Android 富文本**：`rich()` 支持粗体、斜体和颜色标记（只读显示）。
+- **Android 前台服务**：`foreground(title, text)` 启动常驻通知，`stop_foreground()` 停止。
+- **Android 深链**：`agui://` 链接触发窗口 `intent` 事件，`win.intent` 读取 URL。
 - **工具链**：`agui watch` 文件变更自动重启；`agui lsp` 提供基础补全/诊断；`agui debug` 输出逐行执行轨迹。
 - **包管理**：`import "pkg"` 生成命名空间 `pkg.fn()`；`agui.lock` + `agui verify` 做 SHA-256 完整性校验。
 - **Windows 发布**：`agui dist app.ag` 生成绿色目录、zip、`install.ps1`/`uninstall.ps1` 与 `update.json`；`agui update check|apply` 支持本地/HTTP 清单与 zip 更新包。

@@ -367,6 +367,27 @@ func registerUI(i *lang.Interp, a *App) {
 		return nil, nil
 	})
 
+	reg("foreground", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("foreground", args, 1, 2); err != nil {
+			return nil, err
+		}
+		title := lang.ToString(args[0])
+		text := ""
+		if len(args) == 2 {
+			text = lang.ToString(args[1])
+		}
+		a.bridge.Foreground(title, text)
+		return nil, nil
+	})
+
+	reg("stop_foreground", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("stop_foreground", args, 0, 0); err != nil {
+			return nil, err
+		}
+		a.bridge.StopForeground()
+		return nil, nil
+	})
+
 	a.registerGame()
 }
 

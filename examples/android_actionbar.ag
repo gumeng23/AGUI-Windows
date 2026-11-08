@@ -2,7 +2,7 @@
 #name Agui 原生控件
 #package com.agui.actionbar
 #version 0.1.0
-#permission android.permission.VIBRATE android.permission.POST_NOTIFICATIONS android.permission.CAMERA android.permission.RECORD_AUDIO
+#permission android.permission.VIBRATE android.permission.POST_NOTIFICATIONS android.permission.CAMERA android.permission.RECORD_AUDIO android.permission.FOREGROUND_SERVICE android.permission.FOREGROUND_SERVICE_DATA_SYNC
 
 win = window("Agui 原生控件")
 
@@ -34,6 +34,19 @@ label("第一页：原生 View 子集", parent=p1)
 p2 = tabsui.add_page("系统")
 label("第二页：通知、震动、剪贴板、分享", parent=p2)
 tabsui.active = 1
+
+fg = button("启动前台服务")
+on fg.click:
+    foreground("Agui 后台任务", "正在后台运行，点击返回应用")
+    status.text = "前台服务已启动"
+
+stopfg = button("停止前台服务")
+on stopfg.click:
+    stop_foreground()
+    status.text = "前台服务已停止"
+
+on win.intent:
+    status.text = "收到深链：" + win.intent
 
 perm = button("申请相机/麦克风权限组")
 on perm.click:
