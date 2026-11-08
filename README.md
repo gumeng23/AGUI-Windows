@@ -905,7 +905,7 @@ agui/
 - 多行 lambda 不能直接写在函数调用的圆括号里（括号内不产生换行/缩进）；先赋值再传。
 - `import` 是文本级包含；运行时错误仍以主文件行号显示，错误消息里会包含导入文件路径，没有独立源码映射。
 - 菜单支持两级子菜单、真实快捷键与图标；没有动态插入/删除整段菜单的重建 API。
-- Android 原生版已提供 ActionBar、系统对话框、表格、tabs、可滑动 pager、基础 tree、只读富文本、复用列表（ListView）、SAF 保存、相机、定位、录音、传感器、震动/Toast/通知、前台服务、剪贴板、设备信息/电量/网络状态和 `agui://` Deep Link；仍缺下拉刷新、虚拟列表和通用 Intent 封装。表格/tabs/tree 是基础线性布局实现，不支持大数据虚拟化。0.9.1 的 APK 已在 OPPO PEEM00 / Android 14 真机安装启动验证；新增 Android 能力目前只做静态结构与签名校验，ADB 设备断开时未做真机回归。
+- Android 原生版已提供 ActionBar、系统对话框、表格、tabs、可滑动 pager、下拉刷新、基础 tree、只读富文本、复用列表（ListView）、SAF 保存、相机、定位、录音、传感器、震动/Toast/通知、前台服务、剪贴板、设备信息/电量/网络状态和 `agui://` Deep Link；仍缺虚拟列表和通用 Intent 封装。表格/tabs/tree 是基础线性布局实现，不支持大数据虚拟化。0.9.1 的 APK 已在 OPPO PEEM00 / Android 14 真机安装启动验证；新增 Android 能力目前只做静态结构与签名校验，ADB 设备断开时未做真机回归。
 - Windows 的 `edit`/`richedit` 使用原生控件，中文 IME 组合输入由系统处理；自绘 `canvas`/`image` 通过 `name` 暴露 UIA 名称，但没有实现完整的 `IAccessible` 子节点和角色枚举。
 - Android AAB 已支持生成但未用 bundletool 做最终校验；AAB 不签名，上传 Google Play 时由商店签名。
 - Windows 安装包是便携目录 + PowerShell 安装/卸载脚本，不是 MSI；`agui update apply` 已支持 zip 更新包，但仍会短暂启动 PowerShell 替换 exe。

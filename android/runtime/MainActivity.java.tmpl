@@ -40,7 +40,9 @@ import android.view.Gravity;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.ViewFlipper;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -257,6 +259,8 @@ public class MainActivity extends Activity implements Bridge {
                         }
                     });
                     v = flipper;
+                } else if ("refresh".equals(kind)) {
+                    v = new AguiRefresh(MainActivity.this, id);
                 } else if ("tabs".equals(kind) || "tabpage".equals(kind) || "tree".equals(kind)) {
                     LinearLayout box = new LinearLayout(MainActivity.this);
                     box.setOrientation(LinearLayout.VERTICAL);
@@ -950,6 +954,66 @@ public class MainActivity extends Activity implements Bridge {
                 MainActivity.this.startActivity(Intent.createChooser(it, "分享"));
             }
         });
+    }
+
+    public static class AguiRefresh extends FrameLayout {
+        private final long id;
+        private final int slop;
+        private float startY;
+        private boolean pulling;
+
+        public AguiRefresh(Context context, long id) {
+            super(context);
+            this.id = id;
+            this.slop = ViewConfiguration.get(context).getScaledTouchSlop();
+            setClickable(true);
+        }
+
+        private float px(float v) {
+            return v * getResources().getDisplayMetrics().density;
+        }
+
+        @Override public boolean onInterceptTouchEvent(MotionEvent ev) {
+            switch (ev.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    startY = ev.getY();
+                    pulling = false;
+                    return false;
+                case MotionEvent.ACTION_MOVE:
+                    if (ev.getY() - startY > slop) {
+                        pulling = true;
+                        return true;
+                    }
+                    return false;
+                default:
+                    pulling = false;
+                    return false;
+            }
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent ev) {
+            switch (ev.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    startY = ev.getY();
+                    return true;
+                case MotionEvent.ACTION_MOVE: {
+                    float dy = Math.max(0, ev.getY() - startY);
+                    setTranslationY(Math.min(dy * 0.5f, px(90)));
+                    return true;
+                }
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL: {
+                    float dy = Math.max(0, ev.getY() - startY);
+                    animate().translationY(0).setDuration(120).start();
+                    if (ev.getActionMasked() == MotionEvent.ACTION_UP && dy > px(70)) {
+                        Mobile.dispatchRefresh(id);
+                    }
+                    return true;
+                }
+                default:
+                    return super.onTouchEvent(ev);
+            }
+        }
     }
 
     public static class AguiCanvas extends View {

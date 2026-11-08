@@ -1807,6 +1807,13 @@ win = window("星野养成", w=420, h=640)
 - `table(headers, rows)` 在 Android 上使用原生 `TableLayout`，适合几十行以内的配置/结果展示；不是虚拟列表，大数据请使用 `panel` + 分页或 `canvas`。
 - `tabs()` 创建标签页容器，`p = t.add_page("标题")` 返回页面容器，页面内控件用 `parent=p`；`t.active = 1` 切换页面。
 - `pager()` 创建可左右滑动的页面容器，`p = pg.add_page("标题")` 返回页面容器；`pg.active = 1` 切换页面，左右滑动也会更新 `active` 并触发 `change` 事件。Android 端用 `ViewFlipper` + 手势实现，不依赖 AndroidX。
+- `refresh()` 创建下拉刷新容器，子控件用 `parent=容器`；下拉超过阈值后触发 `refresh` 事件。示例：
+  ```agui
+  rf = refresh()
+  label("下拉刷新", parent=rf)
+  on rf.refresh:
+      status.text = "已刷新"
+  ```
 - `tree(items)` 在 Android 上用缩进标签模拟树：`[["父节点", [["子节点", []]]]]`，点击节点触发 `select` 事件，`tree.selected` 是扁平索引；不支持展开/折叠和拖拽。
 - `rich("...")` 在 Android 上渲染只读富文本，支持 `[b]粗体[/b]`、`[i]斜体[/i]`、`[color=#RRGGBB]颜色[/color]`；不支持编辑和超链接。
 - `request_permissions("android.permission.CAMERA", "android.permission.RECORD_AUDIO")` 可一次申请一组运行时权限；每个结果通过窗口 `permission` 事件返回，`win.permission_name` / `win.permission_granted` 读取最近一次结果。权限必须在脚本头部用 `#permission` 声明。

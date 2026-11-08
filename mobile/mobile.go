@@ -515,6 +515,19 @@ func (w *Widget) emit(event string) {
 	}
 }
 
+// DispatchRefresh is called by Java when a pull-to-refresh gesture completes.
+func DispatchRefresh(id int) {
+	currentMu.Lock()
+	a := current
+	currentMu.Unlock()
+	if a == nil {
+		return
+	}
+	if w := a.get(id); w != nil {
+		w.emit("refresh")
+	}
+}
+
 // DispatchClick is called by Java when a button/view is clicked.
 func DispatchClick(id int) {
 	currentMu.Lock()

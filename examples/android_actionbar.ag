@@ -116,6 +116,11 @@ on savebtn.click:
 on win.saved:
     status.text = "已保存：" + win.saved
 
+rf = refresh()
+label("下拉刷新试试", parent=rf)
+on rf.refresh:
+    status.text = "下拉刷新已触发"
+
 pg = pager()
 pg1 = pg.add_page("第一页")
 label("左右滑动可以翻页", parent=pg1)
