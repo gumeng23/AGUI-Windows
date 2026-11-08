@@ -6,12 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 )
 
 type packageMeta struct {
@@ -97,21 +95,9 @@ func copyDir(src, dst string) error {
 }
 
 func downloadFile(url string, limit int64) ([]byte, error) {
-	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Get(url)
+	data, err := registryGET(url, limit)
 	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("下载失败：HTTP %d", resp.StatusCode)
-	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
-	if err != nil {
-		return nil, err
-	}
-	if int64(len(data)) > limit {
-		return nil, fmt.Errorf("文件超过 %d 字节限制", limit)
+		return nil, fmt.Errorf("下载失败：%w", err)
 	}
 	return data, nil
 }

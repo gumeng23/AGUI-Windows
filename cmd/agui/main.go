@@ -84,15 +84,38 @@ func main() {
 			os.Exit(1)
 		}
 	case "install":
-		if len(args) < 2 {
-			fmt.Fprintln(os.Stderr, "用法：agui install <URL或目录/文件> [包名]")
+		rest := args[1:]
+		registryURL := os.Getenv("AGUI_REGISTRY")
+		force := false
+		var positional []string
+		for i := 0; i < len(rest); i++ {
+			switch rest[i] {
+			case "--registry":
+				if i+1 >= len(rest) {
+					fmt.Fprintln(os.Stderr, "用法：agui install --registry <index.json> <包名>")
+					os.Exit(2)
+				}
+				i++
+				registryURL = rest[i]
+			case "--force":
+				force = true
+			default:
+				if strings.HasPrefix(rest[i], "-") {
+					fmt.Fprintln(os.Stderr, "未知选项："+rest[i])
+					os.Exit(2)
+				}
+				positional = append(positional, rest[i])
+			}
+		}
+		if len(positional) < 1 {
+			fmt.Fprintln(os.Stderr, "用法：agui install <包名[@版本]|URL|目录/文件> [包名] [--registry URL] [--force]")
 			os.Exit(2)
 		}
 		name := ""
-		if len(args) >= 3 {
-			name = args[2]
+		if len(positional) >= 2 {
+			name = positional[1]
 		}
-		if err := installPackage(args[1], name); err != nil {
+		if err := installPackageWith(positional[0], name, registryURL, force); err != nil {
 			fmt.Fprintln(os.Stderr, "错误："+err.Error())
 			os.Exit(1)
 		}
@@ -161,7 +184,10 @@ func usage() {
   agui build <脚本.ag> [-o 输出]    按 #target 打包 exe 或 apk（默认 Windows exe）
   agui dist <脚本.ag>               生成 Windows 绿色包/安装脚本/update.json
   agui update check|apply <清单>    检查或应用自动更新（--current 当前exe）
+  agui install <包名[@版本]>         从 registry 下载并安装包到 packages/
   agui install <源> [包名]           安装 .ag 包（URL/本地文件/目录）到 packages/
+  --registry <index.json>           覆盖默认 registry 索引
+  --force                           覆盖已安装的同名包
   agui list                          列出已安装的包
   agui remove <包名>                 删除已安装的包
   agui verify                        按 agui.lock 校验包 SHA-256

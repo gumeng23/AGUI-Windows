@@ -948,7 +948,7 @@ Agui 借鉴了 Python 的缩进和部分语法，但不是 Python：
 - 布局容器支持纵向、网格、锚点和滚动，但没有百分比尺寸、flex 权重和自动换行的水平流式布局。
 - 异步任务是协作式的：CPU 密集脚本会在语句间让出，但单条不可中断的原生调用返回前无法响应取消。
 - `screenshot()` 默认截活动窗口，多窗口时需要传窗口对象。
-- SQLite 依赖 Windows 自带的 `winsqlite3.dll`；包管理器没有版本依赖求解。
+- SQLite 依赖 Windows 自带的 `winsqlite3.dll`；包管理器支持基础版本约束和递归依赖，但没有冲突回溯求解。
 - 托盘依赖 Explorer；受限进程可能得到“拒绝访问”，此时 `tray.visible=false` 且 `last_error` 记录原因。
 - 自签名 exe 只能建立本机信任；SmartScreen 声誉需要正式证书和时间。
 
@@ -1571,6 +1571,8 @@ db.close()
 ### 16.26 包管理器
 
 ```powershell
+agui install mathx
+agui install mathx@0.1.0
 agui install https://example.com/mathx.ag mathx
 agui install .\mypkg mathx
 agui list
@@ -1579,13 +1581,28 @@ agui remove mathx
 
 包安装在项目根的 `packages/` 下，元数据写入 `packages/<name>.json`。安装目录时，入口优先 `<name>.ag`、`<name>/<name>.ag`、`index.ag`、`main.ag`。
 
+默认 registry：
+
+```text
+https://api.github.com/repos/gumeng23/AGUI-registry/contents/index.json
+```
+
+客户端会自动把索引/包中的 `raw.githubusercontent.com` 地址转换为 GitHub Contents API（并请求 raw 媒体类型），因此无需单独配置镜像；`--registry` 仍可指向任意静态 `index.json`。
+
+- `agui install mathx` 下载最新版；`mathx@0.1.0` 精确版本；也支持 `^0.1.0`、`~0.1.0`、`>=0.1.0`。
+- 下载 zip 后强制校验 SHA-256，再解压到 `packages/<name>/`；拒绝 `../` 等越界路径。
+- 依赖声明在包的 `agui-package.json` 中，安装时递归解析并写入 `agui.lock`。
+- `--registry <url>` 或环境变量 `AGUI_REGISTRY` 可覆盖索引；`--force` 覆盖已安装版本。
+- 仓库格式见 https://github.com/gumeng23/AGUI-registry 。
+
 ```agui
 import "mathx"
 print(add(2, 3))
 ```
 
 - 包是文本级包含：导入后定义直接进入当前环境，没有命名空间；推荐用唯一前缀避免冲突。
-- 支持 HTTP(S) 直接 `.ag` 文件（20MB 上限、60 秒超时）和本地文件/目录。
+- 支持 registry 包名、HTTP(S) 直接 `.ag` 文件（20MB 上限、60 秒超时）和本地文件/目录。
+- registry 包是 zip：根目录包含 `agui-package.json` 和入口 `.ag`；单个 zip 上限 64MB。
 - `list` 显示名称、版本和入口。
 
 ### 16.27 RichEdit 选区、链接与图片

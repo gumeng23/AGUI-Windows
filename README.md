@@ -67,7 +67,7 @@ on win.close:
 - **中文关键字别名**：`如果 / 否则 / 对于 / 在 / 函数 / 返回 / 监听 / 尝试 / 捕获 / 导入 / 匿名` 等可直接使用。
 - **单文件打包**：`agui build app.ag` 把脚本和资源一起塞进 exe，双击即运行；可嵌入图标和版本信息。
 - **内置实用库**：消息框、文件对话框、文件读写、剪贴板（文本/图片）、定时器、截图、JSON、base64、HTTP、WebSocket。
-- **二进制与数据**：独立 `bytes` 类型、SQLite（系统 `winsqlite3.dll`）、WAV 播放、包管理器 `agui install/list/remove`。
+- **二进制与数据**：独立 `bytes` 类型、SQLite（系统 `winsqlite3.dll`）、WAV 播放、包管理器 `agui install/list/remove`（支持 registry 包名、版本约束、依赖与 SHA-256 校验）。
 - **更多控件**：groupbox、treeview、canvas（鼠标事件）、可编辑/可排序表格、菜单快捷键与图标、文件拖放、radio、状态栏、日期/时间选择器、tooltip、系统托盘。
 - **依赖极少**：Windows 侧只用 Go 标准库和系统 DLL；只有 Android 构建会引入 `golang.org/x/mobile`（gomobile），运行时依然零依赖。
 
@@ -585,7 +585,7 @@ game_loop(update, fps=60)
 - **RichEdit 增强**：选区、插入文字、超链接、插图。
 - **SQLite**：`sqlite_open()`、`exec/execute/query`、索引、异步查询。
 - **Canvas 鼠标事件**：`mousedown` / `mousemove` / `mouseup`。
-- **包管理器**：`agui install/list/remove`，`import` 自动解析 `packages/`。
+- **包管理器**：`agui install mathx[@版本]` 从 registry 下载、校验并解压，`import` 自动解析 `packages/`。
 
 ```agui
 b = bytes("Agui")
@@ -728,7 +728,7 @@ print(t.visible, t.last_error)
 - SQLite：`sqlite_open`；方法 `exec/execute/query/close`；属性 `tables/last_error/path/closed`。
 - 音频：`play_wav(path, loop=false)`、`stop_wav()`。
 - 托盘：`tray(icon=, tooltip=)`；`item/notify/set_icon/set_tooltip`；受限环境会降级并记录 `last_error`。
-- 包管理：`agui install <URL/路径> [名称]`、`agui list`、`agui remove <名称>`，安装到 `packages/`。
+- 包管理：`agui install <包名[@版本]>`、`agui install <URL/路径> [名称]`、`agui list`、`agui remove <名称>`，安装到 `packages/`；registry 包会校验 SHA-256 并写入 `agui.lock`。
 
 ### 对话框与剪贴板
 
