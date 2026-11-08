@@ -520,7 +520,8 @@ on list.select:
 - **Android 原生 Canvas / Game Kit**：原生 `AguiCanvas` + 触摸事件，支持 `game_loop`、相机、`aabb`、精灵贴图与 `save_json/load_json`。
 - **Android Release**：`--release --ks/--ks-pass/--key-alias/--key-pass/--version-code`，可用正式 keystore 签名；`#version` 与 versionCode 写入 Manifest。
 - **Android 生命周期/系统集成**：`onPause/onResume` 转发 `Mobile.pause/resume`，返回键触发窗口 close；`share(text)`、`open_url(url)`、`vibrate(ms)`、`notify(title, text)`、`clipboard()`/`set_clipboard(text)`；`pick_file` 调 SAF 文件选择器；`#permission` + `request_permission` 走运行时权限。
-- **Android 原生 ActionBar**：`actionbar(title)` 创建顶部应用栏，`bar.add_action("刷新")` 添加可点击菜单按钮；`alert(title, message)` 显示标准系统对话框。
+- **Android 原生 ActionBar**：`actionbar(title)` 创建顶部应用栏，`bar.add_action("刷新")` 添加可点击菜单按钮；`alert(title, message)` 显示信息对话框，`confirm(title, message)` 显示确定/取消对话框并触发窗口 `confirm` 事件。
+- **Android 原生表格/标签页**：`table(headers, rows)` 使用 `TableLayout` 渲染；`tabs()` + `add_page()` 提供基础标签页切换。当前表格非虚拟化，标签页不支持滑动。
 - **工具链**：`agui watch` 文件变更自动重启；`agui lsp` 提供基础补全/诊断；`agui debug` 输出逐行执行轨迹。
 - **包管理**：`import "pkg"` 生成命名空间 `pkg.fn()`；`agui.lock` + `agui verify` 做 SHA-256 完整性校验。
 - **Windows 发布**：`agui dist app.ag` 生成绿色目录、zip、`install.ps1`/`uninstall.ps1` 与 `update.json`；`agui update check|apply` 支持本地/HTTP 清单与 zip 更新包。
@@ -896,7 +897,7 @@ agui/
 - 多行 lambda 不能直接写在函数调用的圆括号里（括号内不产生换行/缩进）；先赋值再传。
 - `import` 是文本级包含；运行时错误仍以主文件行号显示，错误消息里会包含导入文件路径，没有独立源码映射。
 - 菜单支持两级子菜单、真实快捷键与图标；没有动态插入/删除整段菜单的重建 API。
-- Android 原生版仍是子集：menu/tray/table/tree/富文本、Tab/ViewPager、下拉刷新、相机/定位/传感器、前台服务等 Windows 能力未移植；canvas/Game Kit 仅核心 2D 子集。0.9.1 的 `com.agui.star` APK 已在 OPPO PEEM00 / Android 14 真机安装启动验证；新增的 `actionbar`/系统 API 构建已做静态结构与权限校验，设备断开时未做本轮真机回归。
+- Android 原生版仍是子集：menu/tray/tree/富文本、ViewPager/滑动标签页、下拉刷新、虚拟列表、相机/定位/传感器、前台服务等能力未移植；`table`、`tabs` 为基础线性布局实现，不支持大数据虚拟化。0.9.1 的 `com.agui.star` APK 已在 OPPO PEEM00 / Android 14 真机安装启动验证；新增的 `actionbar`/table/tabs/系统 API 构建已做静态结构与权限校验，设备断开时未做本轮真机回归。
 - Android AAB 已支持生成但未用 bundletool 做最终校验；AAB 不签名，上传 Google Play 时由商店签名。
 - Windows 安装包是便携目录 + PowerShell 安装/卸载脚本，不是 MSI；`agui update apply` 已支持 zip 更新包，但仍会短暂启动 PowerShell 替换 exe。
 - 托盘通知 `notify` 依赖 Explorer 的 Shell_NotifyIcon 权限；当前受限终端可能返回 Access denied。

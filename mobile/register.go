@@ -1,6 +1,7 @@
 package mobile
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -39,6 +40,43 @@ func registerUI(i *lang.Interp, a *App) {
 		w := a.addWidget(0, "actionbar", title, 19, "#FFFFFF")
 		applyKw(a, w, kw)
 		return w, nil
+	})
+
+	reg("tabs", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("tabs", args, 0, 0); err != nil {
+			return nil, err
+		}
+		w := a.addWidget(parentID(kw), "tabs", "", 16, "")
+		applyKw(a, w, kw)
+		return w, nil
+	})
+
+	reg("table", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("table", args, 2, 2); err != nil {
+			return nil, err
+		}
+		w := a.addWidget(parentID(kw), "table", "", 14, "")
+		data, err := tableJSON(args[0], args[1])
+		if err != nil {
+			return nil, err
+		}
+		a.bridge.SetTable(w.id, data)
+		applyKw(a, w, kw)
+		return w, nil
+	})
+
+	reg("confirm", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("confirm", args, 1, 2); err != nil {
+			return nil, err
+		}
+		title := "确认"
+		msg := lang.ToString(args[0])
+		if len(args) > 1 {
+			title = lang.ToString(args[0])
+			msg = lang.ToString(args[1])
+		}
+		a.bridge.Confirm(title, msg)
+		return nil, nil
 	})
 
 	reg("panel", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
@@ -282,6 +320,39 @@ func registerUI(i *lang.Interp, a *App) {
 	})
 
 	a.registerGame()
+}
+
+func tableJSON(headers, rows lang.Value) (string, error) {
+	h, ok := headers.(*lang.List)
+	if !ok {
+		return "", fmt.Errorf("table 的表头必须是列表")
+	}
+	r, ok := rows.(*lang.List)
+	if !ok {
+		return "", fmt.Errorf("table 的数据必须是列表")
+	}
+	out := make([][]string, 0, r.Len()+1)
+	head := make([]string, 0, h.Len())
+	for _, v := range h.Items {
+		head = append(head, lang.ToString(v))
+	}
+	out = append(out, head)
+	for _, rv := range r.Items {
+		row, ok := rv.(*lang.List)
+		if !ok {
+			return "", fmt.Errorf("table 的每一行必须是列表")
+		}
+		line := make([]string, 0, row.Len())
+		for _, v := range row.Items {
+			line = append(line, lang.ToString(v))
+		}
+		out = append(out, line)
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
 func applyKw(a *App, w *Widget, kw map[string]lang.Value) {

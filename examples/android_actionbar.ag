@@ -26,6 +26,24 @@ items = ["相机", "定位", "通知", "分享"]
 for name in items:
     label("• " + name, size=16)
 
+t = table(["能力", "状态"], [["ActionBar", "原生"], ["表格", "原生 TableLayout"], ["对话框", "AlertDialog"]])
+
+tabsui = tabs()
+p1 = tabsui.add_page("概览")
+label("第一页：原生 View 子集", parent=p1)
+p2 = tabsui.add_page("系统")
+label("第二页：通知、震动、剪贴板、分享", parent=p2)
+tabsui.active = 1
+okbtn = button("确认示例", w=140)
+on okbtn.click:
+    confirm("确认操作", "要更新状态栏吗？")
+
+on win.confirm:
+    if win.confirm:
+        status.text = "已确认"
+    else:
+        status.text = "已取消"
+
 button("返回", w=120)
 on win.close:
     toast("再见")

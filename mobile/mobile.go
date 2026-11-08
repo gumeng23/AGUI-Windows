@@ -36,6 +36,8 @@ type Bridge interface {
 	Share(text string)
 	PickFile(mime string)
 	RequestPermission(name string)
+	SetTable(id int, json string)
+	Confirm(title string, message string)
 	OpenURL(url string)
 	Vibrate(ms int)
 	Notify(title string, text string)
@@ -49,17 +51,19 @@ type App struct {
 	i      *lang.Interp
 	mu     sync.Mutex
 
-	widgets    map[int]*Widget
-	nextID     int
-	windowID   int
-	timers     map[int]*time.Timer
-	nextTimer  int
-	done       chan struct{}
-	closeOnce  sync.Once
-	game       *gameState
-	lastFile   string
-	lastPerm   string
-	lastPermOK bool
+	widgets       map[int]*Widget
+	nextID        int
+	windowID      int
+	timers        map[int]*time.Timer
+	nextTimer     int
+	done          chan struct{}
+	closeOnce     sync.Once
+	game          *gameState
+	lastFile      string
+	lastPerm      string
+	lastPermOK    bool
+	lastConfirm   bool
+	confirmAnswer bool
 }
 
 // Widget is a native view exposed to Agui.
@@ -85,6 +89,11 @@ type Widget struct {
 	mouseY    float64
 	mouseDown bool
 	mouseBtn  string
+
+	tabHeader  *Widget
+	tabPages   []*Widget
+	tabButtons []*Widget
+	activeTab  int
 }
 
 var (
@@ -289,6 +298,12 @@ func (w *Widget) GetProp(name string) (lang.Value, bool) {
 		return w.app.lastPerm, true
 	case "permission_granted":
 		return w.app.lastPermOK, true
+	case "confirm", "confirmed":
+		return w.app.lastConfirm, true
+	case "active", "active_tab":
+		return float64(w.activeTab), true
+	case "page_count":
+		return float64(len(w.tabPages)), true
 	}
 	return nil, false
 }
@@ -319,6 +334,8 @@ func (w *Widget) SetProp(name string, v lang.Value) error {
 	case "src", "path":
 		w.src = lang.ToString(v)
 		w.app.bridge.SetImage(w.id, w.src)
+	case "active", "active_tab":
+		return w.activateTab(int(number(v)))
 	default:
 		return fmt.Errorf("控件 %s 没有可写属性 %q", w.kind, name)
 	}
@@ -371,8 +388,52 @@ func (w *Widget) CallMethod(name string, args []lang.Value, kwargs map[string]la
 		}
 		item := w.app.addWidget(w.id, "action", lang.ToString(args[0]), 15, "#FFFFFF")
 		return item, true, nil
+	case "add_page":
+		if w.kind != "tabs" {
+			return nil, true, fmt.Errorf("add_page 只能用于 tabs")
+		}
+		if len(args) < 1 {
+			return nil, true, fmt.Errorf("add_page 需要标题")
+		}
+		return w.addTabPage(lang.ToString(args[0])), true, nil
+	case "activate_tab":
+		if w.kind != "tabs" {
+			return nil, true, fmt.Errorf("activate_tab 只能用于 tabs")
+		}
+		if len(args) < 1 {
+			return nil, true, fmt.Errorf("activate_tab 需要索引")
+		}
+		return nil, true, w.activateTab(int(number(args[0])))
 	}
 	return nil, false, nil
+}
+
+func (w *Widget) addTabPage(title string) *Widget {
+	if w.tabHeader == nil {
+		w.tabHeader = w.app.addWidget(w.id, "row", "", 16, "")
+	}
+	idx := len(w.tabPages)
+	btn := w.app.addWidget(w.tabHeader.id, "button", title, 14, "#FFFFFF")
+	page := w.app.addWidget(w.id, "panel", "", 16, "")
+	w.tabButtons = append(w.tabButtons, btn)
+	w.tabPages = append(w.tabPages, page)
+	btn.handlers["click"] = append(btn.handlers["click"], func() error {
+		return w.activateTab(idx)
+	})
+	_ = page.SetProp("visible", idx == 0)
+	w.activeTab = 0
+	return page
+}
+
+func (w *Widget) activateTab(i int) error {
+	if i < 0 || i >= len(w.tabPages) {
+		return fmt.Errorf("标签页索引越界：%d", i)
+	}
+	for n, p := range w.tabPages {
+		_ = p.SetProp("visible", n == i)
+	}
+	w.activeTab = i
+	return nil
 }
 
 func (w *Widget) Listen(event string, fn func() error) error {
@@ -385,7 +446,7 @@ func (w *Widget) Listen(event string, fn func() error) error {
 		if w.kind != "edit" && w.kind != "checkbox" {
 			return fmt.Errorf("%s 不支持 change 事件", w.kind)
 		}
-	case "close", "file", "permission":
+	case "close", "file", "permission", "confirm":
 		if w.kind != "window" {
 			return fmt.Errorf("%s 不支持 %s 事件", w.kind, event)
 		}
@@ -455,6 +516,20 @@ func DispatchFile(path string) {
 	a.lastFile = path
 	if w := a.get(a.windowID); w != nil {
 		w.emit("file")
+	}
+}
+
+// DispatchConfirm is called by Java after a confirm dialog.
+func DispatchConfirm(ok bool) {
+	currentMu.Lock()
+	a := current
+	currentMu.Unlock()
+	if a == nil {
+		return
+	}
+	a.lastConfirm = ok
+	if w := a.get(a.windowID); w != nil {
+		w.emit("confirm")
 	}
 }
 

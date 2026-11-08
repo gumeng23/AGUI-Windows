@@ -1792,6 +1792,9 @@ win = window("星野养成", w=420, h=640)
 - Android 端使用原生 View，不使用 WebView；支持 `window/actionbar/panel/label/button/edit/checkbox/progress/image`，事件 `click/change/close`，以及 `after/every/cancel_timer/quit/toast/alert`。
 - `actionbar(title)` 创建顶部应用栏，`bar.add_action("刷新")` 返回一个可监听 `click` 的菜单按钮；适合放置返回、刷新、关于等常用操作。
 - 系统能力：`share(text)`、`open_url(url)`、`vibrate(毫秒)`、`notify(title, text)`、`clipboard()`、`set_clipboard(text)`；通知和震动需要在文件头用 `#permission` 声明 `POST_NOTIFICATIONS`/`VIBRATE`（Android 13+ 通知还需运行时授权）。
+- `table(headers, rows)` 在 Android 上使用原生 `TableLayout`，适合几十行以内的配置/结果展示；不是虚拟列表，大数据请使用 `panel` + 分页或 `canvas`。
+- `tabs()` 创建标签页容器，`p = t.add_page("标题")` 返回页面容器，页面内控件用 `parent=p`；`t.active = 1` 切换页面。Android 端是轻量线性布局实现，不支持左右滑动/ViewPager。
+- `confirm(title, message)` 显示确定/取消对话框，结果在窗口 `confirm` 事件中读取 `win.confirm`（true=确定，false=取消）。`alert(title, message)` 只显示信息。
 - 构建 Android 需要 `android/runtime/agui.aar`（由 `gomobile bind ... ./mobile` 生成）以及 SDK/JDK；`--asset` 可把额外资源打进 APK。
 - 当前 Native 后端只支持 arm64-v8a；未支持 `menu/tray/table/tree` 等 Windows 专属能力。
 - 原生 Canvas/Game Kit 子集已支持：`canvas`、`game_loop`、触摸、`camera`、`aabb`、`save_json/load_json`；完整 Game Kit 仍以 Windows 为准。
