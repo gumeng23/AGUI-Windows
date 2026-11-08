@@ -1,63 +1,296 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <meta name="theme-color" content="#f6efe6">
-  <title>星野养成 · Agui</title>
-  <link rel="icon" href="oc.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agui —— 把 Windows 小工具写成脚本</title>
+<meta name="description" content="Agui 是一门为 Windows GUI 而生的解释型语言：类 Python 缩进语法直接创建原生 Win32 控件，agui build 打包成约 12 MB 单文件 exe，目标机器零运行时。MIT 开源，当前 v0.9.1。">
+<meta name="theme-color" content="#1d4ed8">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Agui —— 把 Windows 小工具写成脚本">
+<meta property="og:description" content="类 Python 语法 + 原生 Win32 控件，打包成 12 MB 单文件 exe，双击就跑。MIT 开源。">
+<meta property="og:url" content="https://gumeng23.github.io/AGUI-Windows/">
+<meta property="og:image" content="https://gumeng23.github.io/AGUI-Windows/img/hello.png">
+<link rel="icon" href="oc.svg" type="image/svg+xml">
+<link rel="stylesheet" href="site.css">
 </head>
 <body>
-  <main id="app" class="agui-root">
-    <div class="boot" id="boot">
-      <div class="boot-orb"></div>
-      <p>正在唤醒星野…</p>
-    </div>
-  </main>
 
-  <div id="fatal" class="fatal">
-    <div class="fatal-card">
-      <h1>启动失败</h1>
-      <pre class="fatal-msg"></pre>
-      <p>请确认 WebView 支持 WebAssembly，并检查 game.ag。</p>
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="./"><img src="oc.svg" alt=""> Agui</a>
+    <nav class="nav-links">
+      <a href="#features">特性</a>
+      <a href="#shots">截图</a>
+      <a href="#compare">对比</a>
+      <a href="#start">快速开始</a>
+      <a href="demo.html">在线试玩</a>
+      <a href="https://github.com/gumeng23/AGUI-Windows">GitHub</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-ghost btn-sm" href="https://github.com/gumeng23/AGUI-Windows">源码</a>
+      <a class="btn btn-primary btn-sm" href="https://github.com/gumeng23/AGUI-Windows/releases/latest">下载</a>
     </div>
   </div>
+</header>
 
-  <div id="toast" class="toast" role="status"></div>
+<main>
 
-  <script src="game-data.js"></script>
-  <script src="wasm_exec.js"></script>
-  <script>
-    window.aguiToast = function (text) {
-      const el = document.getElementById('toast');
-      el.textContent = text;
-      el.classList.add('show');
-      clearTimeout(window.__toastTimer);
-      window.__toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
-    };
-    window.addEventListener('error', function (e) {
-      const fatal = document.getElementById('fatal');
-      if (!fatal) return;
-      fatal.style.display = 'flex';
-      fatal.querySelector('.fatal-msg').textContent = e.message || String(e.error || e);
-    });
-    (async function () {
-      try {
-        if (!WebAssembly || !WebAssembly.instantiate) {
-          throw new Error('此 WebView 不支持 WebAssembly');
-        }
-        const go = new Go();
-        const bytes = await (await fetch('agui.wasm')).arrayBuffer();
-        const result = await WebAssembly.instantiate(bytes, go.importObject);
-        document.getElementById('boot')?.remove();
-        go.run(result.instance);
-      } catch (err) {
-        const fatal = document.getElementById('fatal');
-        fatal.style.display = 'flex';
-        fatal.querySelector('.fatal-msg').textContent = String(err && err.stack || err);
-      }
-    })();
-  </script>
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <p class="eyebrow">v0.9.1 · MIT · 原生 Windows</p>
+      <h1>把 Windows 小工具，<br>写成<em>脚本</em>。</h1>
+      <p class="lede">
+        Agui 用接近 Python 的缩进语法，直接创建<strong>原生 Win32 控件</strong>——
+        不用 Electron，不用浏览器，也不必先啃一套 UI 框架。
+        一行 <code class="cmd">agui build</code> 打包成约 12 MB 的单文件 exe，双击就跑。
+      </p>
+
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/gumeng23/AGUI-Windows/releases/latest">下载 Windows 版 ↓</a>
+        <a class="btn btn-ghost" href="demo.html">在线试玩 WASM 版</a>
+      </div>
+      <p class="cta-note">约 14 MB 绿色包 · 解压即用 · 不写注册表 · 不需要管理员权限</p>
+
+      <ul class="chips">
+        <li>原生 Win32 控件</li>
+        <li>12 MB 单文件 exe</li>
+        <li>目标机零运行时</li>
+        <li>中文关键字</li>
+        <li>内置 Game Kit</li>
+        <li>MIT 开源</li>
+      </ul>
+    </div>
+
+    <div class="code-card">
+      <div class="code-card-bar">
+        <i class="dot r"></i><i class="dot y"></i><i class="dot g"></i>
+        <span class="file">hello.ag</span>
+      </div>
+<pre class="code"><span class="v">win</span> <span class="p">=</span> <span class="b">window</span><span class="p">(</span><span class="s">"你好，Agui"</span><span class="p">,</span> <span class="n">w</span><span class="p">=</span><span class="n">560</span><span class="p">,</span> <span class="n">h</span><span class="p">=</span><span class="n">320</span><span class="p">)</span>
+
+<span class="b">label</span><span class="p">(</span><span class="s">"欢迎使用 Agui！"</span><span class="p">,</span> <span class="n">fg</span><span class="p">=</span><span class="s">"#1D4ED8"</span><span class="p">)</span>
+<span class="v">name</span> <span class="p">=</span> <span class="b">edit</span><span class="p">(</span><span class="s">"世界"</span><span class="p">,</span> <span class="n">w</span><span class="p">=</span><span class="n">260</span><span class="p">)</span>
+<span class="v">greet</span> <span class="p">=</span> <span class="b">button</span><span class="p">(</span><span class="s">"打招呼"</span><span class="p">,</span> <span class="n">w</span><span class="p">=</span><span class="n">150</span><span class="p">)</span>
+
+<span class="k">on</span> <span class="v">greet</span><span class="p">.</span><span class="v">click</span><span class="p">:</span>
+    <span class="b">msgbox</span><span class="p">(</span><span class="s">"你好，"</span> <span class="p">+</span> <span class="v">name</span><span class="p">.</span><span class="v">text</span> <span class="p">+</span> <span class="s">"！"</span><span class="p">)</span>
+
+<span class="k">on</span> <span class="v">win</span><span class="p">.</span><span class="v">close</span><span class="p">:</span>
+    <span class="b">print</span><span class="p">(</span><span class="s">"再见"</span><span class="p">)</span></pre>
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="start">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>三十秒上手</h2>
+      <p class="section-sub">不用装 Go、不用配环境，解压出来的目录里就有解释器。</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>下载并解压</h3>
+        <p>取 <b>Agui-0.9.1-win64.zip</b>（约 14 MB），解压到任意目录。绿色版，不写注册表。</p>
+        <a class="btn btn-ghost btn-sm" href="https://github.com/gumeng23/AGUI-Windows/releases/latest">去 Releases</a>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>跑一个示例</h3>
+        <p>语法检查不弹窗，运行立刻出窗口：</p>
+        <code class="cmd">agui.exe run examples\hello.ag</code>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>打包成分发文件</h3>
+        <p>脚本与资源一起塞进单个 exe，发给谁都能双击运行：</p>
+        <code class="cmd">agui.exe build app.ag -o app.exe</code>
+      </div>
+    </div>
+
+    <div class="note">
+      <span>💡</span>
+      <div><b>没有 Windows 也能看效果。</b> 浏览器里跑的是同一份解释器编译出的 WASM 版，
+      直接打开 <a href="demo.html"><b>在线试玩</b></a> —— 一个用 Agui 写的 2D 小游戏《星野养成》，没有任何构建步骤。</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="features">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>写给「就想做个工具」的人</h2>
+      <p class="section-sub">该有的原生能力都在，不该有的构建链一个都没有。</p>
+    </div>
+
+    <div class="features">
+      <div class="feature">
+        <h3><i>🪟</i>真正的原生控件</h3>
+        <p>窗口、菜单栏、标签、按钮、输入框、列表、下拉框、进度条、滑块、表格、富文本、系统托盘，全部是 Win32 控件，字体缩放与输入法跟着系统走。</p>
+      </div>
+      <div class="feature">
+        <h3><i>🧩</i>类 Python 的语法</h3>
+        <p>缩进代码块、<code>if/elif/else</code>、<code>while/for</code>、<code>func</code>、闭包、切片、lambda、<code>try/catch</code>、轻量 <code>class</code>，会 Python 就会写。</p>
+      </div>
+      <div class="feature">
+        <h3><i>⚡</i>改一行就是一次运行</h3>
+        <p>解释执行，没有编译等待。调界面时改完直接 <code>agui run</code>，窗口两秒内重开。</p>
+      </div>
+      <div class="feature">
+        <h3><i>📦</i>一个 exe 就是全部</h3>
+        <p><code>agui build</code> 把脚本、图片、图标、版本信息一起打进单文件，目标机器不需要 .NET、浏览器或任何运行时。</p>
+      </div>
+      <div class="feature">
+        <h3><i>🎨</i>省心的布局</h3>
+        <p>不写坐标就自动纵向排列；写了 <code>x/y/w/h</code> 就精确控制；<code>anchor=</code> 贴边，窗口缩放自动重排。还有可嵌套的 <code>panel / scroll / grid</code>。</p>
+      </div>
+      <div class="feature">
+        <h3><i>🔔</i>事件即语法</h3>
+        <p><code>on btn.click:</code> 一眼看清谁在响应什么。后台任务用 <code>async(work, then=...)</code>，完成后自动回 UI 线程。</p>
+      </div>
+      <div class="feature">
+        <h3><i>🎮</i>内置 Game Kit</h3>
+        <p>固定步长游戏循环、键盘/手柄、相机、精灵表、Tilemap、粒子、AABB 与射线碰撞、多声道音频、JSON 存档——做 2D 小游戏够用。</p>
+      </div>
+      <div class="feature">
+        <h3><i>🧰</i>常用工具全带</h3>
+        <p>消息框、文件对话框、剪贴板（文本/图片）、定时器、截图、JSON、base64、HTTP、WebSocket、SQLite、WAV 播放，不用装包。</p>
+      </div>
+      <div class="feature">
+        <h3><i>🈶</i>中文关键字</h3>
+        <p><code>如果 / 否则 / 对于 / 在 / 函数 / 返回 / 监听 / 尝试 / 捕获 / 导入</code> 可以直接用，中文文档与示例是原生的，不是翻译腔。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="shots">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>这些都是脚本跑出来的</h2>
+      <p class="section-sub">截图来自仓库里的 <code>examples/</code>，每一张都能用 <code>agui run</code> 复现。</p>
+    </div>
+
+    <div class="shots">
+      <figure class="shot">
+        <img src="img/hello.png" alt="Hello 窗口" loading="lazy">
+        <figcaption><b>hello.ag</b> —— 8 行得到一个原生窗口、一个输入框和一个按钮</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="img/counter.png" alt="计数器" loading="lazy">
+        <figcaption><b>counter.ag</b> —— 事件绑定与状态更新</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="img/form.png" alt="表单" loading="lazy">
+        <figcaption><b>form.ag</b> —— 自动纵向布局，窗口缩放自动重排</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="img/table.png" alt="表格" loading="lazy">
+        <figcaption><b>table.ag</b> —— 原生表格控件，可编辑、可排序</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="img/menu.png" alt="菜单与工具栏" loading="lazy">
+        <figcaption><b>menu.ag</b> —— 菜单栏、快捷键、图标</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="img/canvas.png" alt="画布" loading="lazy">
+        <figcaption><b>canvas.ag</b> —— 画布与鼠标事件，自己画</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="img/layout.png" alt="布局容器" loading="lazy">
+        <figcaption><b>layout.ag</b> —— panel / scroll / grid 嵌套</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="img/game_cards.png" alt="游戏" loading="lazy">
+        <figcaption><b>game_cards.ag</b> —— Game Kit 写的卡牌小游戏</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="compare">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>和常见的几条路比</h2>
+      <p class="section-sub">不是要取代谁：如果你要的是复杂业务桌面应用，Qt / WPF 更合适。Agui 瞄准的是「几十到几百行就能写完的小工具」。</p>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th></th><th>Agui</th><th>Electron</th><th>Python + PyQt</th><th>C# WinForms</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>产物</td><td class="us">单个 exe，约 12 MB</td><td>100 MB 起的目录</td><td>打包后约 40–60 MB</td><td>几十 MB + .NET 运行时</td></tr>
+          <tr><td>目标机依赖</td><td class="us">无</td><td>随包自带 Chromium</td><td>随包自带 Python</td><td>需 .NET（或自包含发布）</td></tr>
+          <tr><td>界面实现</td><td class="us">原生 Win32 控件</td><td>网页渲染</td><td>Qt 自绘</td><td>原生 Win32 控件</td></tr>
+          <tr><td>上手成本</td><td class="us">解压即用，类 Python 语法</td><td>需前端工程链</td><td>需 Python 环境与打包技巧</td><td>需 Visual Studio / SDK</td></tr>
+          <tr><td>适合场景</td><td class="us">Windows 小工具、内部工具、教学</td><td>跨平台桌面应用</td><td>数据/科研工具</td><td>大型 Windows 业务系统</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="more">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>还有：同一份脚本，构建成原生 Android 应用</h2>
+      <p class="section-sub">
+        在入口文件加一行 <code>#target android</code>，<code>agui build</code> 就会产出 APK：
+        Windows 侧直调 Win32，Android 侧经 gomobile 调原生 View，中间跑的是同一个解释器。
+      </p>
+    </div>
+
+    <div class="note">
+      <span>🧪</span>
+      <div>
+        <b>实验性。</b>APK 已通过 <code>aapt2 badging</code>、<code>apksigner verify</code> 与 dex/native 结构检查，
+        但尚未在真机或模拟器上验证；控件只覆盖 <code>window/panel/label/button/edit/checkbox/progress/image/canvas</code>
+        与 Game Kit 的 <code>game_loop/camera/aabb/save_json</code> 子集，<code>menu/tray/table/tree/richedit</code> 尚未移植。
+        边界写在明面上，胜过让你在 <code>agui build</code> 之后才发现。
+      </div>
+    </div>
+
+    <div class="links">
+      <a class="link-card" href="https://github.com/gumeng23/AGUI-Windows/blob/main/docs/language.md">
+        <strong>语言与 API 参考</strong>
+        <span>语法、控件、事件、Game Kit 全量说明</span>
+      </a>
+      <a class="link-card" href="https://github.com/gumeng23/AGUI-Windows">
+        <strong>示例仓库</strong>
+        <span><code>examples/</code> 里三十多个可直接运行的脚本</span>
+      </a>
+      <a class="link-card" href="https://github.com/gumeng23/AGUI-Windows/releases">
+        <strong>发布记录</strong>
+        <span>Windows 包、Android 运行时、VS Code 扩展</span>
+      </a>
+      <a class="link-card" href="demo.html">
+        <strong>在线试玩</strong>
+        <span>浏览器里跑 WASM 版《星野养成》</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap foot-inner">
+    <div>Agui <b>v0.9.1</b> · MIT License · 用 Go 与 Win32 写成</div>
+    <div class="foot-links">
+      <a href="https://github.com/gumeng23/AGUI-Windows">GitHub</a>
+      <a href="https://github.com/gumeng23/AGUI-Windows/releases/latest">下载</a>
+      <a href="https://github.com/gumeng23/AGUI-Windows/blob/main/docs/language.md">文档</a>
+      <a href="demo.html">在线试玩</a>
+    </div>
+  </div>
+</footer>
+
 </body>
 </html>
