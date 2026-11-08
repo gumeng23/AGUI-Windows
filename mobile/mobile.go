@@ -39,6 +39,8 @@ type Bridge interface {
 	RequestPermissions(names string)
 	Foreground(title string, text string)
 	StopForeground()
+	Camera()
+	Location() string
 	SetTable(id int, json string)
 	Confirm(title string, message string)
 	SaveFile(name string, content string)

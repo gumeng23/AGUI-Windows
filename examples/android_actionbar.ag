@@ -2,7 +2,7 @@
 #name Agui 原生控件
 #package com.agui.actionbar
 #version 0.1.0
-#permission android.permission.VIBRATE android.permission.POST_NOTIFICATIONS android.permission.CAMERA android.permission.RECORD_AUDIO android.permission.FOREGROUND_SERVICE android.permission.FOREGROUND_SERVICE_DATA_SYNC
+#permission android.permission.VIBRATE android.permission.POST_NOTIFICATIONS android.permission.CAMERA android.permission.RECORD_AUDIO android.permission.ACCESS_FINE_LOCATION android.permission.FOREGROUND_SERVICE android.permission.FOREGROUND_SERVICE_DATA_SYNC
 
 win = window("Agui 原生控件")
 
@@ -47,6 +47,21 @@ on stopfg.click:
 
 on win.intent:
     status.text = "收到深链：" + win.intent
+
+cam = button("拍照")
+on cam.click:
+    camera()
+
+loc = button("读取最后位置")
+on loc.click:
+    pos = location()
+    if pos == "":
+        status.text = "暂无位置（请先授权定位并让系统定位一次）"
+    else:
+        status.text = "位置：" + pos
+
+on win.file:
+    status.text = "文件：" + win.last_file
 
 perm = button("申请相机/麦克风权限组")
 on perm.click:

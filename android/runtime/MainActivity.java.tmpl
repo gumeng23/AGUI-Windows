@@ -63,6 +63,7 @@ public class MainActivity extends Activity implements Bridge {
     private boolean updating = false;
     private static final int REQ_PICK = 43;
     private static final int REQ_PERM = 44;
+    private static final int REQ_CAMERA = 46;
     private static final int REQ_SAVE = 45;
     private String pendingSaveContent = "";
 
@@ -598,7 +599,23 @@ public class MainActivity extends Activity implements Bridge {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        if (resultCode != RESULT_OK) return;
+        if (requestCode == REQ_CAMERA) {
+            if (data == null || data.getExtras() == null) return;
+            Bitmap bmp = (Bitmap) data.getExtras().get("data");
+            if (bmp == null) return;
+            try {
+                File out = new File(getCacheDir(), "agui-camera-" + System.currentTimeMillis() + ".jpg");
+                FileOutputStream fos = new FileOutputStream(out);
+                bmp.compress(Bitmap.CompressFormat.JPEG, 90, fos);
+                fos.close();
+                Mobile.dispatchFile(out.getAbsolutePath());
+            } catch (Exception e) {
+                Toast.makeText(this, "保存照片失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
+        if (data == null || data.getData() == null) return;
         Uri uri = data.getData();
         if (requestCode == REQ_SAVE) {
             try {
@@ -674,6 +691,31 @@ public class MainActivity extends Activity implements Bridge {
             boolean ok = grantResults != null && i < grantResults.length
                     && grantResults[i] == android.content.pm.PackageManager.PERMISSION_GRANTED;
             Mobile.dispatchPermission(permissions[i], ok);
+        }
+    }
+
+    @Override public void camera() {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                Intent it = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+                startActivityForResult(it, REQ_CAMERA);
+            }
+        });
+    }
+
+    @Override public String location() {
+        try {
+            android.location.LocationManager lm =
+                    (android.location.LocationManager) getSystemService(LOCATION_SERVICE);
+            android.location.Location l = lm.getLastKnownLocation(
+                    android.location.LocationManager.NETWORK_PROVIDER);
+            if (l == null) l = lm.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER);
+            if (l == null) return "";
+            return l.getLatitude() + "," + l.getLongitude();
+        } catch (SecurityException e) {
+            return "";
+        } catch (Exception e) {
+            return "";
         }
     }
 

@@ -388,6 +388,21 @@ func registerUI(i *lang.Interp, a *App) {
 		return nil, nil
 	})
 
+	reg("camera", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("camera", args, 0, 0); err != nil {
+			return nil, err
+		}
+		a.bridge.Camera()
+		return nil, nil
+	})
+
+	reg("location", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("location", args, 0, 0); err != nil {
+			return nil, err
+		}
+		return a.bridge.Location(), nil
+	})
+
 	a.registerGame()
 }
 
