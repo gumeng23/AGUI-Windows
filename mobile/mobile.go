@@ -36,6 +36,7 @@ type Bridge interface {
 	Share(text string)
 	PickFile(mime string)
 	RequestPermission(name string)
+	RequestPermissions(names string)
 	SetTable(id int, json string)
 	Confirm(title string, message string)
 	SaveFile(name string, content string)

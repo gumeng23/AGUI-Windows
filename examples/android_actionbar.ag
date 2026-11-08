@@ -2,7 +2,7 @@
 #name Agui 原生控件
 #package com.agui.actionbar
 #version 0.1.0
-#permission android.permission.VIBRATE android.permission.POST_NOTIFICATIONS
+#permission android.permission.VIBRATE android.permission.POST_NOTIFICATIONS android.permission.CAMERA android.permission.RECORD_AUDIO
 
 win = window("Agui 原生控件")
 
@@ -34,6 +34,13 @@ label("第一页：原生 View 子集", parent=p1)
 p2 = tabsui.add_page("系统")
 label("第二页：通知、震动、剪贴板、分享", parent=p2)
 tabsui.active = 1
+
+perm = button("申请相机/麦克风权限组")
+on perm.click:
+    request_permissions("android.permission.CAMERA", "android.permission.RECORD_AUDIO")
+    status.text = "已发起权限组请求"
+
+richbox = rich("[b]富文本[/b] 支持 [color=#C2410C]颜色[/color] 与 [i]斜体[/i]。")
 
 treeview = tree([["原生 UI", [["ActionBar", []], ["表格", []], ["标签页", []]]], ["系统", [["通知", []], ["保存文件", []]]]])
 on treeview.select:

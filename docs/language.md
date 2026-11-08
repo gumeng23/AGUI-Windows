@@ -1795,6 +1795,8 @@ win = window("星野养成", w=420, h=640)
 - `table(headers, rows)` 在 Android 上使用原生 `TableLayout`，适合几十行以内的配置/结果展示；不是虚拟列表，大数据请使用 `panel` + 分页或 `canvas`。
 - `tabs()` 创建标签页容器，`p = t.add_page("标题")` 返回页面容器，页面内控件用 `parent=p`；`t.active = 1` 切换页面。Android 端是轻量线性布局实现，不支持左右滑动/ViewPager。
 - `tree(items)` 在 Android 上用缩进标签模拟树：`[["父节点", [["子节点", []]]]]`，点击节点触发 `select` 事件，`tree.selected` 是扁平索引；不支持展开/折叠和拖拽。
+- `rich("...")` 在 Android 上渲染只读富文本，支持 `[b]粗体[/b]`、`[i]斜体[/i]`、`[color=#RRGGBB]颜色[/color]`；不支持编辑和超链接。
+- `request_permissions("android.permission.CAMERA", "android.permission.RECORD_AUDIO")` 可一次申请一组运行时权限；每个结果通过窗口 `permission` 事件返回，`win.permission_name` / `win.permission_granted` 读取最近一次结果。权限必须在脚本头部用 `#permission` 声明。
 - `confirm(title, message)` 显示确定/取消对话框，结果在窗口 `confirm` 事件中读取 `win.confirm`（true=确定，false=取消）。`alert(title, message)` 只显示信息。
 - `save_file(name, content)` 打开系统“另存为”选择器；保存完成触发窗口 `saved` 事件，`win.saved` 是目标文档 URI。写入使用 SAF，不需要存储权限。
 - 构建 Android 需要 `android/runtime/agui.aar`（由 `gomobile bind ... ./mobile` 生成）以及 SDK/JDK；`--asset` 可把额外资源打进 APK。

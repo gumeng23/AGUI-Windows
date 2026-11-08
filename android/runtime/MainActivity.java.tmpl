@@ -21,7 +21,10 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Vibrator;
 import android.text.Editable;
+import android.text.SpannableStringBuilder;
 import android.text.TextWatcher;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -108,6 +111,48 @@ public class MainActivity extends Activity implements Bridge {
         Mobile.start(script, this);
     }
 
+    private CharSequence richParse(String s) {
+        SpannableStringBuilder out = new SpannableStringBuilder();
+        boolean bold = false, italic = false;
+        int color = 0, i = 0;
+        while (i < s.length()) {
+            int open = s.indexOf('[', i);
+            if (open < 0) {
+                appendRich(out, s.substring(i), bold, italic, color);
+                break;
+            }
+            if (open > i) appendRich(out, s.substring(i, open), bold, italic, color);
+            int close = s.indexOf(']', open + 1);
+            if (close < 0) {
+                appendRich(out, s.substring(open), bold, italic, color);
+                break;
+            }
+            String tag = s.substring(open + 1, close);
+            if (tag.equals("b")) bold = true;
+            else if (tag.equals("/b")) bold = false;
+            else if (tag.equals("i")) italic = true;
+            else if (tag.equals("/i")) italic = false;
+            else if (tag.equals("/color")) color = 0;
+            else if (tag.startsWith("color=")) {
+                try { color = Color.parseColor(tag.substring(6)); } catch (Exception ignored) {}
+            } else {
+                appendRich(out, s.substring(open, close + 1), bold, italic, color);
+            }
+            i = close + 1;
+        }
+        return out;
+    }
+
+    private void appendRich(SpannableStringBuilder out, String text, boolean bold, boolean italic, int color) {
+        if (text.isEmpty()) return;
+        int start = out.length();
+        out.append(text);
+        int end = out.length();
+        if (bold) out.setSpan(new StyleSpan(android.graphics.Typeface.BOLD), start, end, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (italic) out.setSpan(new StyleSpan(android.graphics.Typeface.ITALIC), start, end, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (color != 0) out.setSpan(new ForegroundColorSpan(color), start, end, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE);
+    }
+
     private int dp(int v) {
         return Math.round(v * getResources().getDisplayMetrics().density);
     }
@@ -172,6 +217,13 @@ public class MainActivity extends Activity implements Bridge {
                     table.setStretchAllColumns(true);
                     table.setPadding(0, dp(4), 0, dp(4));
                     v = table;
+                } else if ("rich".equals(kind)) {
+                    TextView tv = new TextView(MainActivity.this);
+                    tv.setTextSize(16);
+                    tv.setTextColor(Color.rgb(55, 45, 40));
+                    tv.setPadding(0, dp(6), 0, dp(6));
+                    tv.setText(richParse(text));
+                    v = tv;
                 } else if ("label".equals(kind)) {
                     TextView tv = new TextView(MainActivity.this);
                     tv.setText(text);
@@ -247,6 +299,7 @@ public class MainActivity extends Activity implements Bridge {
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                 lp.bottomMargin = dp(10);
                 target.addView(v, lp);
+                v.setTag(kind);
                 views.put(id, v);
             }
         });
@@ -260,7 +313,11 @@ public class MainActivity extends Activity implements Bridge {
                     topTitle.setText(text);
                 } else if (v instanceof TextView) {
                     updating = true;
-                    ((TextView) v).setText(text);
+                    if ("rich".equals(v.getTag())) {
+                        ((TextView) v).setText(richParse(text));
+                    } else {
+                        ((TextView) v).setText(text);
+                    }
                     updating = false;
                 }
             }
@@ -585,12 +642,27 @@ public class MainActivity extends Activity implements Bridge {
         });
     }
 
+    @Override public void requestPermissions(final String names) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                String[] list = names.split(",");
+                if (android.os.Build.VERSION.SDK_INT >= 23) {
+                    requestPermissions(list, REQ_PERM);
+                } else {
+                    for (String name : list) Mobile.dispatchPermission(name, true);
+                }
+            }
+        });
+    }
+
     @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode != REQ_PERM || permissions == null || permissions.length == 0) return;
-        boolean ok = grantResults != null && grantResults.length > 0
-                && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
-        Mobile.dispatchPermission(permissions[0], ok);
+        for (int i = 0; i < permissions.length; i++) {
+            boolean ok = grantResults != null && i < grantResults.length
+                    && grantResults[i] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            Mobile.dispatchPermission(permissions[i], ok);
+        }
     }
 
     @Override public void share(final String text) {

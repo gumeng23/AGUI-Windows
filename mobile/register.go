@@ -51,6 +51,15 @@ func registerUI(i *lang.Interp, a *App) {
 		return w, nil
 	})
 
+	reg("rich", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("rich", args, 1, 1); err != nil {
+			return nil, err
+		}
+		w := a.addWidget(parentID(kw), "rich", lang.ToString(args[0]), 56, "")
+		applyKw(a, w, kw)
+		return w, nil
+	})
+
 	reg("tree", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
 		if err := argCount("tree", args, 1, 1); err != nil {
 			return nil, err
@@ -339,6 +348,22 @@ func registerUI(i *lang.Interp, a *App) {
 			return nil, fmt.Errorf("权限名必须以 android.permission. 开头")
 		}
 		a.bridge.RequestPermission(name)
+		return nil, nil
+	})
+
+	reg("request_permissions", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if len(args) == 0 {
+			return nil, fmt.Errorf("request_permissions 至少需要一个权限名")
+		}
+		names := make([]string, 0, len(args))
+		for _, v := range args {
+			name := lang.ToString(v)
+			if !strings.HasPrefix(name, "android.permission.") {
+				return nil, fmt.Errorf("权限名必须以 android.permission. 开头：%s", name)
+			}
+			names = append(names, name)
+		}
+		a.bridge.RequestPermissions(strings.Join(names, ","))
 		return nil, nil
 	})
 
