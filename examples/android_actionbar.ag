@@ -34,6 +34,10 @@ label("第一页：原生 View 子集", parent=p1)
 p2 = tabsui.add_page("系统")
 label("第二页：通知、震动、剪贴板、分享", parent=p2)
 tabsui.active = 1
+
+treeview = tree([["原生 UI", [["ActionBar", []], ["表格", []], ["标签页", []]]], ["系统", [["通知", []], ["保存文件", []]]]])
+on treeview.select:
+    status.text = "树节点：" + str(treeview.selected)
 okbtn = button("确认示例", w=140)
 on okbtn.click:
     confirm("确认操作", "要更新状态栏吗？")
@@ -43,6 +47,13 @@ on win.confirm:
         status.text = "已确认"
     else:
         status.text = "已取消"
+
+savebtn = button("保存文本", w=140)
+on savebtn.click:
+    save_file("agui-demo.txt", "Agui Android 原生保存示例\n")
+
+on win.saved:
+    status.text = "已保存：" + win.saved
 
 button("返回", w=120)
 on win.close:

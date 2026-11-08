@@ -58,6 +58,8 @@ public class MainActivity extends Activity implements Bridge {
     private boolean updating = false;
     private static final int REQ_PICK = 43;
     private static final int REQ_PERM = 44;
+    private static final int REQ_SAVE = 45;
+    private String pendingSaveContent = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -157,7 +159,7 @@ public class MainActivity extends Activity implements Bridge {
                     LinearLayout box = new LinearLayout(MainActivity.this);
                     box.setOrientation(LinearLayout.VERTICAL);
                     v = box;
-                } else if ("tabs".equals(kind) || "tabpage".equals(kind)) {
+                } else if ("tabs".equals(kind) || "tabpage".equals(kind) || "tree".equals(kind)) {
                     LinearLayout box = new LinearLayout(MainActivity.this);
                     box.setOrientation(LinearLayout.VERTICAL);
                     v = box;
@@ -176,6 +178,9 @@ public class MainActivity extends Activity implements Bridge {
                     tv.setTextSize(17);
                     tv.setTextColor(Color.rgb(55, 45, 40));
                     tv.setPadding(0, dp(4), 0, dp(4));
+                    tv.setOnClickListener(new View.OnClickListener() {
+                        @Override public void onClick(View view) { Mobile.dispatchClick(id); }
+                    });
                     v = tv;
                 } else if ("button".equals(kind)) {
                     Button b = new Button(MainActivity.this);
@@ -524,8 +529,21 @@ public class MainActivity extends Activity implements Bridge {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQ_PICK || resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
         Uri uri = data.getData();
+        if (requestCode == REQ_SAVE) {
+            try {
+                java.io.OutputStream out = getContentResolver().openOutputStream(uri);
+                if (out == null) throw new Exception("无法写入文件");
+                out.write(pendingSaveContent.getBytes("UTF-8"));
+                out.close();
+                Mobile.dispatchSaved(uri.toString());
+            } catch (Exception e) {
+                Toast.makeText(this, "保存失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
+        if (requestCode != REQ_PICK) return;
         try {
             File out = new File(getCacheDir(), "agui-pick-" + System.currentTimeMillis() + ".bin");
             InputStream in = getContentResolver().openInputStream(uri);
@@ -540,6 +558,19 @@ public class MainActivity extends Activity implements Bridge {
         } catch (Exception e) {
             Toast.makeText(this, "读取文件失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
         }
+    }
+
+    @Override public void saveFile(final String name, final String content) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                pendingSaveContent = content;
+                Intent it = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                it.addCategory(Intent.CATEGORY_OPENABLE);
+                it.setType("text/plain");
+                it.putExtra(Intent.EXTRA_TITLE, name);
+                startActivityForResult(it, REQ_SAVE);
+            }
+        });
     }
 
     @Override public void requestPermission(final String name) {

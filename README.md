@@ -522,6 +522,8 @@ on list.select:
 - **Android 生命周期/系统集成**：`onPause/onResume` 转发 `Mobile.pause/resume`，返回键触发窗口 close；`share(text)`、`open_url(url)`、`vibrate(ms)`、`notify(title, text)`、`clipboard()`/`set_clipboard(text)`；`pick_file` 调 SAF 文件选择器；`#permission` + `request_permission` 走运行时权限。
 - **Android 原生 ActionBar**：`actionbar(title)` 创建顶部应用栏，`bar.add_action("刷新")` 添加可点击菜单按钮；`alert(title, message)` 显示信息对话框，`confirm(title, message)` 显示确定/取消对话框并触发窗口 `confirm` 事件。
 - **Android 原生表格/标签页**：`table(headers, rows)` 使用 `TableLayout` 渲染；`tabs()` + `add_page()` 提供基础标签页切换。当前表格非虚拟化，标签页不支持滑动。
+- **Android 文件保存**：`save_file(name, content)` 走 SAF 创建文档，完成后触发窗口 `saved` 事件并通过 `win.saved` 读取 URI。
+- **Android 基础树**：`tree(items)` 用缩进标签渲染层级，点击节点触发 `select`；不支持展开/折叠。
 - **工具链**：`agui watch` 文件变更自动重启；`agui lsp` 提供基础补全/诊断；`agui debug` 输出逐行执行轨迹。
 - **包管理**：`import "pkg"` 生成命名空间 `pkg.fn()`；`agui.lock` + `agui verify` 做 SHA-256 完整性校验。
 - **Windows 发布**：`agui dist app.ag` 生成绿色目录、zip、`install.ps1`/`uninstall.ps1` 与 `update.json`；`agui update check|apply` 支持本地/HTTP 清单与 zip 更新包。

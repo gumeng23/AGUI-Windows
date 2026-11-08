@@ -51,6 +51,16 @@ func registerUI(i *lang.Interp, a *App) {
 		return w, nil
 	})
 
+	reg("tree", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("tree", args, 1, 1); err != nil {
+			return nil, err
+		}
+		w := a.addWidget(parentID(kw), "tree", "", 16, "")
+		applyKw(a, w, kw)
+		walkTree(w, args[0], 0)
+		return w, nil
+	})
+
 	reg("table", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
 		if err := argCount("table", args, 2, 2); err != nil {
 			return nil, err
@@ -295,6 +305,19 @@ func registerUI(i *lang.Interp, a *App) {
 		return nil, nil
 	})
 
+	reg("save_file", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("save_file", args, 1, 2); err != nil {
+			return nil, err
+		}
+		name := lang.ToString(args[0])
+		content := ""
+		if len(args) > 1 {
+			content = lang.ToString(args[1])
+		}
+		a.bridge.SaveFile(name, content)
+		return nil, nil
+	})
+
 	reg("pick_file", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
 		if err := argCount("pick_file", args, 0, 1); err != nil {
 			return nil, err
@@ -320,6 +343,42 @@ func registerUI(i *lang.Interp, a *App) {
 	})
 
 	a.registerGame()
+}
+
+func walkTree(t *Widget, v lang.Value, depth int) {
+	if list, ok := v.(*lang.List); ok {
+		if list.Len() == 2 {
+			if children, ok := list.Items[1].(*lang.List); ok {
+				t.addTreeLabel(lang.ToString(list.Items[0]), depth)
+				walkTree(t, children, depth+1)
+				return
+			}
+		}
+		for _, item := range list.Items {
+			walkTree(t, item, depth)
+		}
+		return
+	}
+	t.addTreeLabel(lang.ToString(v), depth)
+}
+
+func (w *Widget) addTreeLabel(text string, depth int) {
+	idx := len(w.treeTexts)
+	label := w.app.addWidget(w.id, "label", strings.Repeat("  ", depth)+"▸ "+text, 16, "#37352F")
+	w.treeTexts = append(w.treeTexts, text)
+	w.treeLabels = append(w.treeLabels, label)
+	label.handlers["click"] = append(label.handlers["click"], func() error {
+		for i, l := range w.treeLabels {
+			if i == idx {
+				_ = l.SetProp("fg", "#9A3412")
+			} else {
+				_ = l.SetProp("fg", "#37352F")
+			}
+		}
+		w.treeIndex = idx
+		w.emit("select")
+		return nil
+	})
 }
 
 func tableJSON(headers, rows lang.Value) (string, error) {

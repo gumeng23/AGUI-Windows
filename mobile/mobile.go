@@ -38,6 +38,7 @@ type Bridge interface {
 	RequestPermission(name string)
 	SetTable(id int, json string)
 	Confirm(title string, message string)
+	SaveFile(name string, content string)
 	OpenURL(url string)
 	Vibrate(ms int)
 	Notify(title string, text string)
@@ -51,19 +52,19 @@ type App struct {
 	i      *lang.Interp
 	mu     sync.Mutex
 
-	widgets       map[int]*Widget
-	nextID        int
-	windowID      int
-	timers        map[int]*time.Timer
-	nextTimer     int
-	done          chan struct{}
-	closeOnce     sync.Once
-	game          *gameState
-	lastFile      string
-	lastPerm      string
-	lastPermOK    bool
-	lastConfirm   bool
-	confirmAnswer bool
+	widgets     map[int]*Widget
+	nextID      int
+	windowID    int
+	timers      map[int]*time.Timer
+	nextTimer   int
+	done        chan struct{}
+	closeOnce   sync.Once
+	game        *gameState
+	lastFile    string
+	lastPerm    string
+	lastPermOK  bool
+	lastConfirm bool
+	lastSaved   string
 }
 
 // Widget is a native view exposed to Agui.
@@ -94,6 +95,10 @@ type Widget struct {
 	tabPages   []*Widget
 	tabButtons []*Widget
 	activeTab  int
+
+	treeLabels []*Widget
+	treeTexts  []string
+	treeIndex  int
 }
 
 var (
@@ -304,6 +309,16 @@ func (w *Widget) GetProp(name string) (lang.Value, bool) {
 		return float64(w.activeTab), true
 	case "page_count":
 		return float64(len(w.tabPages)), true
+	case "saved", "saved_file":
+		return w.app.lastSaved, true
+	case "selected":
+		if w.kind == "tree" {
+			return float64(w.treeIndex), true
+		}
+	case "count":
+		if w.kind == "tree" {
+			return float64(len(w.treeTexts)), true
+		}
 	}
 	return nil, false
 }
@@ -446,9 +461,13 @@ func (w *Widget) Listen(event string, fn func() error) error {
 		if w.kind != "edit" && w.kind != "checkbox" {
 			return fmt.Errorf("%s 不支持 change 事件", w.kind)
 		}
-	case "close", "file", "permission", "confirm":
+	case "close", "file", "permission", "confirm", "saved":
 		if w.kind != "window" {
 			return fmt.Errorf("%s 不支持 %s 事件", w.kind, event)
+		}
+	case "select":
+		if w.kind != "tree" {
+			return fmt.Errorf("%s 不支持 select 事件", w.kind)
 		}
 	case "mousedown", "mouseup", "mousemove":
 		if w.kind != "canvas" {
@@ -530,6 +549,20 @@ func DispatchConfirm(ok bool) {
 	a.lastConfirm = ok
 	if w := a.get(a.windowID); w != nil {
 		w.emit("confirm")
+	}
+}
+
+// DispatchSaved is called by Java after the user saves a document.
+func DispatchSaved(path string) {
+	currentMu.Lock()
+	a := current
+	currentMu.Unlock()
+	if a == nil {
+		return
+	}
+	a.lastSaved = path
+	if w := a.get(a.windowID); w != nil {
+		w.emit("saved")
 	}
 }
 
