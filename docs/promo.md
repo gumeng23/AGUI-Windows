@@ -43,7 +43,8 @@
 | --- | --- | --- | --- |
 | P0 | 想跑必须先装 Go 1.22+ 再 `build.bat` | **GitHub Releases 放 `agui.exe` + 示例 exe**，README 顶部一个大按钮「下载即用」 | ✅ v0.9.1 发布 3 个资产；README 首屏已加「下载即用」（check/run/build 三条命令），「快速开始」下沉为「从源码构建」 |
 | P0 | 仓库描述是「…制作于 deepseek flash 4.1」 | 中英双语，点明「12 MB 单文件 exe / 零运行时」，**不要提 AI 生成** | ✅ 已改（中文 + English），topics 10 个已加 |
-| P0 | 无在线试玩 | `web/`（WASM）走 GitHub Pages | ✅ <https://gumeng23.github.io/AGUI-Windows/> 已上线，workflow 见 `.github/workflows/pages.yml` |
+| P0 | 无在线试玩 | `web/`（WASM）走 GitHub Pages | ✅ <https://gumeng23.github.io/AGUI-Windows/> 已上线，workflow 见 `.github/workflows/pages.yml`；2026-11-08 首页改为项目官网（特性/截图/对比/上手），游戏移到 `/demo.html` |
+| P0 | 无「值得点开」的官网 | Pages 只放游戏加载页 | ✅ 已补：hero + 三十秒上手 + 9 条特性 + 8 张截图 + 四方案对比 + Android 限制说明 |
 | P0 | 无主页链接 | 仓库右侧 Homepage 填 Pages 地址 | ⚠️ **仍未填**（Pages 已通，填上等于多一个入口） |
 | P1 | `aguicode.zip`（66MB）提交在仓库里 | 从 HEAD 移除（历史可保留） | ✅ 已移除 |
 | P1 | README 很长但首屏没有「30 秒看懂」 | 首屏：一句话 + GIF + 下载/试玩 + 最小示例 | 🟡 一句话、下载、试玩、示例都齐了，**GIF 仍缺**（静态图讲不出「脚本→窗口」的落差） |
