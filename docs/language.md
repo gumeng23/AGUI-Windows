@@ -1816,10 +1816,11 @@ win = window("星野养成", w=420, h=640)
 - `start_record()` / `stop_record()` 使用麦克风录音，停止后触发窗口 `file` 事件，路径在 `win.last_file`；需要 `RECORD_AUDIO`。
 - `sensor("accelerometer")` 返回最近一次加速度 `x,y,z`；也支持 `"gyroscope"`、`"light"`。首次调用时注册监听，无数据返回空字符串。
 - `list(items)` 在 Android 上使用 `ListView` + `ArrayAdapter`，行视图会复用，适合上千行长列表；目前只读，没有选中事件和自定义行布局。
+- `device_info()` 返回厂商/型号/Android 版本；`battery()` 返回电量百分比（-1 表示不可用）；`network()` 返回 `wifi` / `cellular` / `ethernet` / `online` / `offline`。
 - `confirm(title, message)` 显示确定/取消对话框，结果在窗口 `confirm` 事件中读取 `win.confirm`（true=确定，false=取消）。`alert(title, message)` 只显示信息。
 - `save_file(name, content)` 打开系统“另存为”选择器；保存完成触发窗口 `saved` 事件，`win.saved` 是目标文档 URI。写入使用 SAF，不需要存储权限。
 - 构建 Android 需要 `android/runtime/agui.aar`（由 `gomobile bind ... ./mobile` 生成）以及 SDK/JDK；`--asset` 可把额外资源打进 APK。
-- 当前 Native 后端只支持 arm64-v8a；未支持 `menu/tray/table/tree` 等 Windows 专属能力。
+- 当前 Native 后端只支持 arm64-v8a；Windows 专属的 `menu/tray` 等能力未移植，但 ActionBar、表格、tabs、tree、富文本、列表和主要系统 API 已有原生实现。
 - 原生 Canvas/Game Kit 子集已支持：`canvas`、`game_loop`、触摸、`camera`、`aabb`、`save_json/load_json`；完整 Game Kit 仍以 Windows 为准。
 - release 构建：`agui build app.ag --release --ks release.keystore --ks-pass ... --key-alias agui --key-pass ... --version-code 2`。
 - 生命周期：`onPause/onResume` 转发到解释器，返回键触发窗口 `close`；`share(text)` 调系统分享。

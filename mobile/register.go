@@ -448,6 +448,27 @@ func registerUI(i *lang.Interp, a *App) {
 		return a.bridge.Sensor(lang.ToString(args[0])), nil
 	})
 
+	reg("device_info", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("device_info", args, 0, 0); err != nil {
+			return nil, err
+		}
+		return a.bridge.DeviceInfo(), nil
+	})
+
+	reg("battery", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("battery", args, 0, 0); err != nil {
+			return nil, err
+		}
+		return float64(a.bridge.Battery()), nil
+	})
+
+	reg("network", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("network", args, 0, 0); err != nil {
+			return nil, err
+		}
+		return a.bridge.Network(), nil
+	})
+
 	a.registerGame()
 }
 

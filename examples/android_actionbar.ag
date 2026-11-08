@@ -22,6 +22,10 @@ on refresh.click:
 title = label("原生 View 组件", size=24, fg="#9A3412")
 status = label("点击右上角菜单", size=14, fg="#78716C")
 
+info = button("设备信息")
+on info.click:
+    status.text = device_info() + " · 电量 " + str(battery()) + "% · " + network()
+
 items = ["相机", "定位", "通知", "分享"]
 for name in items:
     label("• " + name, size=16)

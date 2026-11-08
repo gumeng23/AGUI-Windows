@@ -22,7 +22,11 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.media.MediaRecorder;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.Uri;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -826,6 +830,29 @@ public class MainActivity extends Activity implements Bridge {
             recorder = null;
         }
         super.onDestroy();
+    }
+
+    @Override public String deviceInfo() {
+        return Build.MANUFACTURER + " " + Build.MODEL + " / Android "
+                + Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ")";
+    }
+
+    @Override public long battery() {
+        BatteryManager bm = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        if (bm == null) return -1;
+        return bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+    }
+
+    @Override public String network() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        if (cm == null) return "unknown";
+        Network n = cm.getActiveNetwork();
+        NetworkCapabilities nc = n == null ? null : cm.getNetworkCapabilities(n);
+        if (nc == null) return "offline";
+        if (nc.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return "wifi";
+        if (nc.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) return "cellular";
+        if (nc.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) return "ethernet";
+        return "online";
     }
 
     @Override public void foreground(final String title, final String text) {

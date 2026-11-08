@@ -48,6 +48,9 @@ type Bridge interface {
 	SetList(id int, json string)
 	Confirm(title string, message string)
 	SaveFile(name string, content string)
+	DeviceInfo() string
+	Battery() int
+	Network() string
 	OpenURL(url string)
 	Vibrate(ms int)
 	Notify(title string, text string)
