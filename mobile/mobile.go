@@ -52,6 +52,9 @@ type Bridge interface {
 	DeviceInfo() string
 	Battery() int
 	Network() string
+	StartIntent(action string, data string, mime string)
+	PermissionRationale(name string) bool
+	OpenAppSettings()
 	OpenURL(url string)
 	Vibrate(ms int)
 	Notify(title string, text string)

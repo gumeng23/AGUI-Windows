@@ -487,6 +487,38 @@ func registerUI(i *lang.Interp, a *App) {
 		return a.bridge.Network(), nil
 	})
 
+	reg("intent", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("intent", args, 1, 3); err != nil {
+			return nil, err
+		}
+		action := lang.ToString(args[0])
+		data := ""
+		mime := ""
+		if len(args) > 1 {
+			data = lang.ToString(args[1])
+		}
+		if len(args) > 2 {
+			mime = lang.ToString(args[2])
+		}
+		a.bridge.StartIntent(action, data, mime)
+		return nil, nil
+	})
+
+	reg("permission_rationale", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("permission_rationale", args, 1, 1); err != nil {
+			return nil, err
+		}
+		return a.bridge.PermissionRationale(lang.ToString(args[0])), nil
+	})
+
+	reg("open_settings", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("open_settings", args, 0, 0); err != nil {
+			return nil, err
+		}
+		a.bridge.OpenAppSettings()
+		return nil, nil
+	})
+
 	a.registerGame()
 }
 

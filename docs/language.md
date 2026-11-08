@@ -1817,6 +1817,8 @@ win = window("星野养成", w=420, h=640)
 - `tree(items)` 在 Android 上用缩进标签模拟树：`[["父节点", [["子节点", []]]]]`，点击节点触发 `select` 事件，`tree.selected` 是扁平索引；不支持展开/折叠和拖拽。
 - `rich("...")` 在 Android 上渲染只读富文本，支持 `[b]粗体[/b]`、`[i]斜体[/i]`、`[color=#RRGGBB]颜色[/color]`；不支持编辑和超链接。
 - `request_permissions("android.permission.CAMERA", "android.permission.RECORD_AUDIO")` 可一次申请一组运行时权限；每个结果通过窗口 `permission` 事件返回，`win.permission_name` / `win.permission_granted` 读取最近一次结果。权限必须在脚本头部用 `#permission` 声明。
+- `permission_rationale(name)` 判断是否适合再次弹系统授权框；`open_settings()` 打开当前应用设置页，用于用户永久拒绝后的引导。
+- `intent(action, data="", mime="")` 启动任意 Android Intent，例如 `intent("android.settings.SETTINGS")`、`intent("android.intent.action.VIEW", "https://example.com")`。`open_url` 是 VIEW 的便捷封装。
 - `foreground(title, text)` / `stop_foreground()` 启动/停止 Android 前台服务，通知栏会显示常驻通知；Android 14 使用 `dataSync` 类型，脚本需声明 `FOREGROUND_SERVICE` 与 `FOREGROUND_SERVICE_DATA_SYNC`。
 - 深链：清单注册 `agui://` scheme；应用收到链接时触发窗口 `intent` 事件，`win.intent` 读取 URL。启动 Activity 时和 `onNewIntent` 都会分发。
 - `camera()` 调用系统相机，返回缩略图并保存到缓存 JPEG，随后触发窗口 `file` 事件，路径在 `win.last_file`。

@@ -30,6 +30,7 @@ import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.provider.Settings;
 import android.os.Vibrator;
 import android.text.Editable;
 import android.text.SpannableStringBuilder;
@@ -762,6 +763,40 @@ public class MainActivity extends Activity implements Bridge {
                     requestPermissions(list, REQ_PERM);
                 } else {
                     for (String name : list) Mobile.dispatchPermission(name, true);
+                }
+            }
+        });
+    }
+
+    @Override public void startIntent(final String action, final String data, final String mime) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                try {
+                    Intent it = new Intent(action);
+                    if (!data.isEmpty()) it.setData(Uri.parse(data));
+                    if (!mime.isEmpty()) it.setType(mime);
+                    startActivity(it);
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, "无法启动 Intent：" + e.getMessage(), Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+    }
+
+    @Override public boolean permissionRationale(String name) {
+        if (android.os.Build.VERSION.SDK_INT < 23) return false;
+        return shouldShowRequestPermissionRationale(name);
+    }
+
+    @Override public void openAppSettings() {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                try {
+                    Intent it = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                    it.setData(Uri.parse("package:" + getPackageName()));
+                    startActivity(it);
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, "无法打开设置：" + e.getMessage(), Toast.LENGTH_LONG).show();
                 }
             }
         });

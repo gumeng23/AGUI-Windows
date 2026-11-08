@@ -89,6 +89,22 @@ on perm.click:
     request_permissions("android.permission.CAMERA", "android.permission.RECORD_AUDIO")
     status.text = "已发起权限组请求"
 
+on win.permission:
+    if win.permission_granted:
+        status.text = "已授权：" + win.permission_name
+    elif permission_rationale(win.permission_name):
+        status.text = "可以再次申请：" + win.permission_name
+    else:
+        status.text = "已拒绝，请到应用设置中开启：" + win.permission_name
+
+settingsbtn = button("打开应用设置")
+on settingsbtn.click:
+    open_settings()
+
+intentbtn = button("打开系统设置（Intent）")
+on intentbtn.click:
+    intent("android.settings.SETTINGS")
+
 items = []
 for i in range(1000):
     items.append("列表项 " + str(i))
