@@ -1,0 +1,12 @@
+win = window("虚拟表格", 760, 560, center=true)
+
+rows = []
+for i in range(10000):
+    rows.append([str(i), "数据行 " + str(i), str(i * 3)])
+
+t = table(["编号", "名称", "数值"], rows, virtual=true, h=420)
+status = label("共 " + str(t.row_count) + " 行（仅渲染可见区域）")
+on t.select:
+    status.text = "选中第 " + str(t.selected) + " 行"
+
+after(20000, quit)

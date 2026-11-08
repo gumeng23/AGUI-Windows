@@ -232,6 +232,86 @@ func Register(i *lang.Interp) *App {
 	regContainer("scroll", "scroll")
 	regContainer("grid", "grid", "cols")
 
+	reg("toolbar", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
+		if err := lang.CheckArity("toolbar", args, 0); err != nil {
+			return nil, err
+		}
+		if err := checkKw(kwargs, widgetKw()...); err != nil {
+			return nil, err
+		}
+		x, y, w, h, err := app.geometry(kwargs)
+		if err != nil {
+			return nil, err
+		}
+		widget, err := app.createToolbar(x, y, w, h)
+		if err != nil {
+			return nil, err
+		}
+		return widget, app.applyCommon(widget, kwargs)
+	})
+
+	reg("splitter", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
+		if err := lang.CheckArity("splitter", args, 1); err != nil {
+			return nil, err
+		}
+		if err := checkKw(kwargs, widgetKw("vertical")...); err != nil {
+			return nil, err
+		}
+		vertical := kwBool(kwargs, "vertical", false)
+		if len(args) > 0 {
+			vertical = lang.Truthy(args[0])
+		}
+		x, y, w, h, err := app.geometry(kwargs)
+		if err != nil {
+			return nil, err
+		}
+		widget, err := app.createSplitter(vertical, x, y, w, h)
+		if err != nil {
+			return nil, err
+		}
+		return widget, app.applyCommon(widget, kwargs)
+	})
+
+	reg("tabs", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
+		if err := lang.CheckArity("tabs", args, 0); err != nil {
+			return nil, err
+		}
+		if err := checkKw(kwargs, widgetKw()...); err != nil {
+			return nil, err
+		}
+		x, y, w, h, err := app.geometry(kwargs)
+		if err != nil {
+			return nil, err
+		}
+		widget, err := app.createTabs(x, y, w, h)
+		if err != nil {
+			return nil, err
+		}
+		return widget, app.applyCommon(widget, kwargs)
+	})
+
+	reg("propertygrid", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
+		if err := lang.CheckArity("propertygrid", args, 0); err != nil {
+			return nil, err
+		}
+		if err := checkKw(kwargs, widgetKw("rows")...); err != nil {
+			return nil, err
+		}
+		rows, err := toRows(lang.Named(args, kwargs, 0, "rows", nil))
+		if err != nil {
+			return nil, err
+		}
+		x, y, w, h, err := app.geometry(kwargs)
+		if err != nil {
+			return nil, err
+		}
+		widget, err := app.createPropertyGrid(rows, x, y, w, h)
+		if err != nil {
+			return nil, err
+		}
+		return widget, app.applyCommon(widget, kwargs)
+	})
+
 	reg("checkbox", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {
 		if err := lang.CheckArity("checkbox", args, 1); err != nil {
 			return nil, err
@@ -547,7 +627,7 @@ func Register(i *lang.Interp) *App {
 		if err := lang.CheckArity("table", args, 2); err != nil {
 			return nil, err
 		}
-		if err := checkKw(kwargs, widgetKw("headers", "rows", "editable")...); err != nil {
+		if err := checkKw(kwargs, widgetKw("headers", "rows", "editable", "virtual")...); err != nil {
 			return nil, err
 		}
 		headers, err := toItems(lang.Named(args, kwargs, 0, "headers", nil))
@@ -562,7 +642,8 @@ func Register(i *lang.Interp) *App {
 		if err != nil {
 			return nil, err
 		}
-		widget, err := app.createTable(headers, rows, x, y, w, h)
+		virtual := kwBool(kwargs, "virtual", false)
+		widget, err := app.createTable(headers, rows, x, y, w, h, virtual)
 		if err != nil {
 			return nil, err
 		}
@@ -986,6 +1067,15 @@ func (a *App) coord(kwargs map[string]lang.Value, names ...string) (*int32, erro
 	return nil, nil
 }
 
+func darkBackgroundKind(kind string) bool {
+	switch kind {
+	case "button", "edit", "checkbox", "radio", "listbox", "combo", "tree",
+		"table", "richedit", "tabs", "toolbar", "splitter", "tabpage", "panel":
+		return true
+	}
+	return false
+}
+
 func (a *App) applyCommon(w *Widget, kwargs map[string]lang.Value) error {
 	if a.darkTheme {
 		if _, ok := kwargs["fg"]; !ok && w.kind != "window" {
@@ -993,7 +1083,7 @@ func (a *App) applyCommon(w *Widget, kwargs map[string]lang.Value) error {
 				return err
 			}
 		}
-		if _, ok := kwargs["bg"]; !ok && (w.kind == "button" || w.kind == "edit" || w.kind == "checkbox") {
+		if _, ok := kwargs["bg"]; !ok && darkBackgroundKind(w.kind) {
 			if err := w.SetProp("bg", "#1E293B"); err != nil {
 				return err
 			}

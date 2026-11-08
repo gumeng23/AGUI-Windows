@@ -52,7 +52,7 @@ on win.close:
 
 ## 特性
 
-- **原生 GUI**：窗口、菜单栏、标签、按钮、输入框、复选框、列表、下拉框、进度条、滑块、图片、富文本、表格，全部是 Win32 控件。
+- **原生 GUI**：窗口、菜单栏、标签、按钮、输入框、复选框、列表、下拉框、进度条、滑块、图片、富文本、表格、树、标签页、分栏、工具栏、属性表，全部是 Win32 控件。
 - **现代外观**：运行时激活 Common Controls v6 视觉样式，按钮、复选框、滚动条跟随系统主题。
 - **多窗口**：`window()` 可创建任意多个顶层窗口（独立窗口，或用 `parent=` 创建从属窗口），每个窗口有独立的控件树、菜单栏和背景色。
 - **自绘彩色按钮**：按钮的 `fg` / `bg` 真正生效，支持自定义文字色、背景色和默认按钮样式。
@@ -60,7 +60,9 @@ on win.close:
 - **事件即语法**：`on btn.click:` 注册点击事件，代码结构一眼可见。
 - **后台任务**：`async(work, then=...)` 返回可等待、可取消的 `task`；任务在后台协作式运行，完成后回到 UI 线程更新界面。
 - **Game Kit**：固定步长游戏循环、键盘/手柄、相机、精灵表、Tilemap、粒子、AABB/射线碰撞、多声道音频、全屏和 JSON 存档，足以制作 2D 小游戏。
-- **布局容器**：`panel` / `scroll` / `grid` 可嵌套，支持明确锚点、滚动和网格排列；隐藏控件不占位。
+- **布局容器**：`panel` / `scroll` / `grid` / `toolbar` / `splitter` / `tabs` 可嵌套，支持明确锚点、滚动、网格、分栏和标签页；隐藏控件不占位。
+- **大数据表格**：`table(..., virtual=true)` 只渲染可见行，10 万行数据仍可流畅滚动。
+- **Per-Monitor DPI**：Windows 10 1703+ 默认 Per-Monitor V2，跨不同缩放比例的显示器时自动更新字体并重排。
 - **省心布局**：不写坐标就自动纵向排列；写了 `x/y/w/h` 就精确控制；`anchor=` 让控件贴在父容器边上；窗口缩放时自动重排。
 - **中文关键字别名**：`如果 / 否则 / 对于 / 在 / 函数 / 返回 / 监听 / 尝试 / 捕获 / 导入 / 匿名` 等可直接使用。
 - **单文件打包**：`agui build app.ag` 把脚本和资源一起塞进 exe，双击即运行；可嵌入图标和版本信息。
@@ -517,7 +519,8 @@ on list.select:
 
 - **Android 原生 Canvas / Game Kit**：原生 `AguiCanvas` + 触摸事件，支持 `game_loop`、相机、`aabb`、精灵贴图与 `save_json/load_json`。
 - **Android Release**：`--release --ks/--ks-pass/--key-alias/--key-pass/--version-code`，可用正式 keystore 签名；`#version` 与 versionCode 写入 Manifest。
-- **Android 生命周期/系统集成**：`onPause/onResume` 转发 `Mobile.pause/resume`，返回键触发窗口 close；`share(text)` 调用系统分享；`pick_file` 调 SAF 文件选择器；`#permission` + `request_permission` 走运行时权限。
+- **Android 生命周期/系统集成**：`onPause/onResume` 转发 `Mobile.pause/resume`，返回键触发窗口 close；`share(text)`、`open_url(url)`、`vibrate(ms)`、`notify(title, text)`、`clipboard()`/`set_clipboard(text)`；`pick_file` 调 SAF 文件选择器；`#permission` + `request_permission` 走运行时权限。
+- **Android 原生 ActionBar**：`actionbar(title)` 创建顶部应用栏，`bar.add_action("刷新")` 添加可点击菜单按钮；`alert(title, message)` 显示标准系统对话框。
 - **工具链**：`agui watch` 文件变更自动重启；`agui lsp` 提供基础补全/诊断；`agui debug` 输出逐行执行轨迹。
 - **包管理**：`import "pkg"` 生成命名空间 `pkg.fn()`；`agui.lock` + `agui verify` 做 SHA-256 完整性校验。
 - **Windows 发布**：`agui dist app.ag` 生成绿色目录、zip、`install.ps1`/`uninstall.ps1` 与 `update.json`；`agui update check|apply` 支持本地/HTTP 清单与 zip 更新包。
@@ -893,14 +896,14 @@ agui/
 - 多行 lambda 不能直接写在函数调用的圆括号里（括号内不产生换行/缩进）；先赋值再传。
 - `import` 是文本级包含；运行时错误仍以主文件行号显示，错误消息里会包含导入文件路径，没有独立源码映射。
 - 菜单支持两级子菜单、真实快捷键与图标；没有动态插入/删除整段菜单的重建 API。
-- Android 原生版仍是子集：menu/tray/table/tree 等 Windows 能力未移植；canvas/Game Kit 仅核心 2D 子集。APK 已通过静态结构与签名验证，但当前环境无真机/模拟器，安装启动验证待补。
+- Android 原生版仍是子集：menu/tray/table/tree/富文本、Tab/ViewPager、下拉刷新、相机/定位/传感器、前台服务等 Windows 能力未移植；canvas/Game Kit 仅核心 2D 子集。0.9.1 的 `com.agui.star` APK 已在 OPPO PEEM00 / Android 14 真机安装启动验证；新增的 `actionbar`/系统 API 构建已做静态结构与权限校验，设备断开时未做本轮真机回归。
 - Android AAB 已支持生成但未用 bundletool 做最终校验；AAB 不签名，上传 Google Play 时由商店签名。
 - Windows 安装包是便携目录 + PowerShell 安装/卸载脚本，不是 MSI；`agui update apply` 已支持 zip 更新包，但仍会短暂启动 PowerShell 替换 exe。
 - 托盘通知 `notify` 依赖 Explorer 的 Shell_NotifyIcon 权限；当前受限终端可能返回 Access denied。
 - 富文本支持选区、超链接和插图；复杂表格/分页排版仍需要直接使用 Win32 消息。
-- 表格支持编辑、排序和 `edit` 事件；没有虚拟化、多选、列宽拖拽保存、分组。
+- 表格支持编辑、排序、`edit` 事件和 `virtual=true` 虚拟滚动；没有多选、列宽拖拽保存、分组。
 - treeview 与 canvas 是基础封装：tree 没有拖拽节点/多选；canvas 没有贝塞尔曲线、路径填充、渐变和混合模式。
-- 布局容器支持纵向、网格、锚点和滚动；没有百分比尺寸、flex 权重和水平流式换行。
+- 布局容器支持纵向、网格、锚点、滚动、分栏、工具栏和标签页；没有百分比尺寸、flex 权重和水平流式换行。分栏需要拖动 6px 分隔条，暂无可见把手。
 - 自绘按钮支持纯色背景和文字色；渐变、圆角、图标需要后续扩展。
 - 异步任务是协作式的：CPU 密集脚本会在语句间让出，但单条不可中断的原生调用返回前无法响应取消。
 - `screenshot()` 截取的是指定窗口（默认活动窗口）；多窗口时请传窗口对象。

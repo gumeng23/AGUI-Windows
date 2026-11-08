@@ -15,6 +15,26 @@ func panelWndProc(hwnd syscall.Handle, msg uint32, wparam, lparam uintptr) uintp
 	}
 	w := a.widgetByHWND(hwnd)
 	switch msg {
+	case wmLButtonDown:
+		if w != nil && w.kind == "splitter" {
+			x := int32(int16(lparam & 0xFFFF))
+			y := int32(int16((lparam >> 16) & 0xFFFF))
+			if w.startSplitDrag(x, y) {
+				return 0
+			}
+		}
+	case wmMouseMove:
+		if w != nil && w.kind == "splitter" && w.splitDrag {
+			x := int32(int16(lparam & 0xFFFF))
+			y := int32(int16((lparam >> 16) & 0xFFFF))
+			w.updateSplitDrag(x, y)
+			return 0
+		}
+	case wmLButtonUp:
+		if w != nil && w.kind == "splitter" && w.splitDrag {
+			w.endSplitDrag()
+			return 0
+		}
 	case wmEraseBkgnd:
 		if w != nil {
 			hdc := syscall.Handle(wparam)

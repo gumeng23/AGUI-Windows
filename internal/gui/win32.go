@@ -19,75 +19,77 @@ var (
 )
 
 var (
-	pRegisterClassExW         = user32.NewProc("RegisterClassExW")
-	pCreateWindowExW          = user32.NewProc("CreateWindowExW")
-	pDefWindowProcW           = user32.NewProc("DefWindowProcW")
-	pDestroyWindow            = user32.NewProc("DestroyWindow")
-	pShowWindow               = user32.NewProc("ShowWindow")
-	pUpdateWindow             = user32.NewProc("UpdateWindow")
-	pGetMessageW              = user32.NewProc("GetMessageW")
-	pTranslateMessage         = user32.NewProc("TranslateMessage")
-	pDispatchMessageW         = user32.NewProc("DispatchMessageW")
-	pPostQuitMessage          = user32.NewProc("PostQuitMessage")
-	pPostMessageW             = user32.NewProc("PostMessageW")
-	pSendMessageW             = user32.NewProc("SendMessageW")
-	pSetWindowTextW           = user32.NewProc("SetWindowTextW")
-	pGetWindowTextW           = user32.NewProc("GetWindowTextW")
-	pGetWindowTextLengthW     = user32.NewProc("GetWindowTextLengthW")
-	pGetClientRect            = user32.NewProc("GetClientRect")
-	pGetWindowRect            = user32.NewProc("GetWindowRect")
-	pMoveWindow               = user32.NewProc("MoveWindow")
-	pSetWindowPos             = user32.NewProc("SetWindowPos")
-	pSetFocus                 = user32.NewProc("SetFocus")
-	pGetFocus                 = user32.NewProc("GetFocus")
-	pEnableWindow             = user32.NewProc("EnableWindow")
-	pIsWindowVisible          = user32.NewProc("IsWindowVisible")
-	pIsWindowEnabled          = user32.NewProc("IsWindowEnabled")
-	pIsDialogMessageW         = user32.NewProc("IsDialogMessageW")
-	pAdjustWindowRectEx       = user32.NewProc("AdjustWindowRectEx")
-	pGetSystemMetrics         = user32.NewProc("GetSystemMetrics")
-	pSetProcessDPIAware       = user32.NewProc("SetProcessDPIAware")
-	pGetDpiForSystem          = user32.NewProc("GetDpiForSystem")
-	pGetDC                    = user32.NewProc("GetDC")
-	pReleaseDC                = user32.NewProc("ReleaseDC")
-	pFillRect                 = user32.NewProc("FillRect")
-	pSetTimer                 = user32.NewProc("SetTimer")
-	pKillTimer                = user32.NewProc("KillTimer")
-	pInvalidateRect           = user32.NewProc("InvalidateRect")
-	pMessageBoxW              = user32.NewProc("MessageBoxW")
-	pLoadCursorW              = user32.NewProc("LoadCursorW")
-	pLoadIconW                = user32.NewProc("LoadIconW")
-	pSetForegroundWindow      = user32.NewProc("SetForegroundWindow")
-	pSetCapture               = user32.NewProc("SetCapture")
-	pReleaseCapture           = user32.NewProc("ReleaseCapture")
-	pGetWindowDC              = user32.NewProc("GetWindowDC")
-	pPrintWindow              = user32.NewProc("PrintWindow")
-	pMapWindowPoints          = user32.NewProc("MapWindowPoints")
-	pGetParent                = user32.NewProc("GetParent")
-	pSetWindowTheme           = user32.NewProc("SetWindowTheme")
-	pGetWindowLongPtrW        = user32.NewProc("GetWindowLongPtrW")
-	pSetWindowLongPtrW        = user32.NewProc("SetWindowLongPtrW")
-	pCallWindowProcW          = user32.NewProc("CallWindowProcW")
-	pDrawTextW                = user32.NewProc("DrawTextW")
-	pDrawEdge                 = user32.NewProc("DrawEdge")
-	pDrawFocusRect            = user32.NewProc("DrawFocusRect")
-	pFrameRect                = user32.NewProc("FrameRect")
-	pBeginPaint               = user32.NewProc("BeginPaint")
-	pEndPaint                 = user32.NewProc("EndPaint")
-	pSetScrollRange           = user32.NewProc("SetScrollRange")
-	pSetScrollPos             = user32.NewProc("SetScrollPos")
-	pIsWindow                 = user32.NewProc("IsWindow")
-	pGetClipboardData         = user32.NewProc("GetClipboardData")
-	pSetClipboardData         = user32.NewProc("SetClipboardData")
-	pRegisterClipboardFormatW = user32.NewProc("RegisterClipboardFormatW")
-	pOpenClipboard            = user32.NewProc("OpenClipboard")
-	pCloseClipboard           = user32.NewProc("CloseClipboard")
-	pEmptyClipboard           = user32.NewProc("EmptyClipboard")
-	pIsClipboardFormatAvail   = user32.NewProc("IsClipboardFormatAvailable")
-	pDragAcceptFiles          = shell32.NewProc("DragAcceptFiles")
-	pDragQueryFileW           = shell32.NewProc("DragQueryFileW")
-	pDragFinish               = shell32.NewProc("DragFinish")
-	pShellExecuteW            = shell32.NewProc("ShellExecuteW")
+	pRegisterClassExW          = user32.NewProc("RegisterClassExW")
+	pCreateWindowExW           = user32.NewProc("CreateWindowExW")
+	pDefWindowProcW            = user32.NewProc("DefWindowProcW")
+	pDestroyWindow             = user32.NewProc("DestroyWindow")
+	pShowWindow                = user32.NewProc("ShowWindow")
+	pUpdateWindow              = user32.NewProc("UpdateWindow")
+	pGetMessageW               = user32.NewProc("GetMessageW")
+	pTranslateMessage          = user32.NewProc("TranslateMessage")
+	pDispatchMessageW          = user32.NewProc("DispatchMessageW")
+	pPostQuitMessage           = user32.NewProc("PostQuitMessage")
+	pPostMessageW              = user32.NewProc("PostMessageW")
+	pSendMessageW              = user32.NewProc("SendMessageW")
+	pSetWindowTextW            = user32.NewProc("SetWindowTextW")
+	pGetWindowTextW            = user32.NewProc("GetWindowTextW")
+	pGetWindowTextLengthW      = user32.NewProc("GetWindowTextLengthW")
+	pGetClientRect             = user32.NewProc("GetClientRect")
+	pGetWindowRect             = user32.NewProc("GetWindowRect")
+	pMoveWindow                = user32.NewProc("MoveWindow")
+	pSetWindowPos              = user32.NewProc("SetWindowPos")
+	pSetFocus                  = user32.NewProc("SetFocus")
+	pGetFocus                  = user32.NewProc("GetFocus")
+	pEnableWindow              = user32.NewProc("EnableWindow")
+	pIsWindowVisible           = user32.NewProc("IsWindowVisible")
+	pIsWindowEnabled           = user32.NewProc("IsWindowEnabled")
+	pIsDialogMessageW          = user32.NewProc("IsDialogMessageW")
+	pAdjustWindowRectEx        = user32.NewProc("AdjustWindowRectEx")
+	pGetSystemMetrics          = user32.NewProc("GetSystemMetrics")
+	pSetProcessDPIAware        = user32.NewProc("SetProcessDPIAware")
+	pSetProcessDPIAwarenessCtx = user32.NewProc("SetProcessDpiAwarenessContext")
+	pGetDpiForSystem           = user32.NewProc("GetDpiForSystem")
+	pGetDpiForWindow           = user32.NewProc("GetDpiForWindow")
+	pGetDC                     = user32.NewProc("GetDC")
+	pReleaseDC                 = user32.NewProc("ReleaseDC")
+	pFillRect                  = user32.NewProc("FillRect")
+	pSetTimer                  = user32.NewProc("SetTimer")
+	pKillTimer                 = user32.NewProc("KillTimer")
+	pInvalidateRect            = user32.NewProc("InvalidateRect")
+	pMessageBoxW               = user32.NewProc("MessageBoxW")
+	pLoadCursorW               = user32.NewProc("LoadCursorW")
+	pLoadIconW                 = user32.NewProc("LoadIconW")
+	pSetForegroundWindow       = user32.NewProc("SetForegroundWindow")
+	pSetCapture                = user32.NewProc("SetCapture")
+	pReleaseCapture            = user32.NewProc("ReleaseCapture")
+	pGetWindowDC               = user32.NewProc("GetWindowDC")
+	pPrintWindow               = user32.NewProc("PrintWindow")
+	pMapWindowPoints           = user32.NewProc("MapWindowPoints")
+	pGetParent                 = user32.NewProc("GetParent")
+	pSetWindowTheme            = user32.NewProc("SetWindowTheme")
+	pGetWindowLongPtrW         = user32.NewProc("GetWindowLongPtrW")
+	pSetWindowLongPtrW         = user32.NewProc("SetWindowLongPtrW")
+	pCallWindowProcW           = user32.NewProc("CallWindowProcW")
+	pDrawTextW                 = user32.NewProc("DrawTextW")
+	pDrawEdge                  = user32.NewProc("DrawEdge")
+	pDrawFocusRect             = user32.NewProc("DrawFocusRect")
+	pFrameRect                 = user32.NewProc("FrameRect")
+	pBeginPaint                = user32.NewProc("BeginPaint")
+	pEndPaint                  = user32.NewProc("EndPaint")
+	pSetScrollRange            = user32.NewProc("SetScrollRange")
+	pSetScrollPos              = user32.NewProc("SetScrollPos")
+	pIsWindow                  = user32.NewProc("IsWindow")
+	pGetClipboardData          = user32.NewProc("GetClipboardData")
+	pSetClipboardData          = user32.NewProc("SetClipboardData")
+	pRegisterClipboardFormatW  = user32.NewProc("RegisterClipboardFormatW")
+	pOpenClipboard             = user32.NewProc("OpenClipboard")
+	pCloseClipboard            = user32.NewProc("CloseClipboard")
+	pEmptyClipboard            = user32.NewProc("EmptyClipboard")
+	pIsClipboardFormatAvail    = user32.NewProc("IsClipboardFormatAvailable")
+	pDragAcceptFiles           = shell32.NewProc("DragAcceptFiles")
+	pDragQueryFileW            = shell32.NewProc("DragQueryFileW")
+	pDragFinish                = shell32.NewProc("DragFinish")
+	pShellExecuteW             = shell32.NewProc("ShellExecuteW")
 
 	pCreateFontW            = gdi32.NewProc("CreateFontW")
 	pCreateSolidBrush       = gdi32.NewProc("CreateSolidBrush")
@@ -166,6 +168,8 @@ const (
 
 	wmDestroy         = 0x0002
 	wmSize            = 0x0005
+	wmDpiChanged      = 0x02E0
+	wmSetFont         = 0x0030
 	wmPaint           = 0x000F
 	wmPaste           = 0x0302
 	wmSetIcon         = 0x0080
@@ -184,7 +188,6 @@ const (
 	wmClose           = 0x0010
 	wmQuit            = 0x0012
 	wmEraseBkgnd      = 0x0014
-	wmSetFont         = 0x0030
 	wmGetTextLength   = 0x000E
 	wmSetText         = 0x000C
 	wmGetText         = 0x000D
@@ -274,6 +277,7 @@ const (
 
 	bmSetCheck = 0x00F1
 	bmGetCheck = 0x00F0
+	bmSetState = 0x00F3
 	bmClick    = 0x00F5
 	bstChecked = 1
 
@@ -784,8 +788,22 @@ func stockObject(id int32) syscall.Handle {
 	return syscall.Handle(h)
 }
 
+var processPerMonitor bool
+
+// enablePerMonitorDPI opts into per-monitor v2 awareness when the OS supports
+// it. It must run before the first window is created.
+func enablePerMonitorDPI() bool {
+	if pSetProcessDPIAwarenessCtx.Find() == nil {
+		// DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 is (HANDLE)-4.
+		if r, _, _ := pSetProcessDPIAwarenessCtx.Call(^uintptr(3)); r != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func systemDPI() int32 {
-	if pSetProcessDPIAware.Find() == nil {
+	if !processPerMonitor && pSetProcessDPIAware.Find() == nil {
 		pSetProcessDPIAware.Call()
 	}
 	if pGetDpiForSystem.Find() == nil {

@@ -110,6 +110,7 @@ func NewApp(i *lang.Interp) *App {
 		gap:         10,
 		fontSize:    10,
 	}
+	processPerMonitor = enablePerMonitorDPI()
 	a.dpi = systemDPI()
 	a.scale = float64(a.dpi) / 96.0
 	if a.scale < 1 {
@@ -202,6 +203,29 @@ func (a *App) EnsureWindow() *Widget {
 		panic(err)
 	}
 	return w
+}
+
+// applyDPI updates the cached scale and re-applies the default UI font after a
+// window moves to a monitor with a different DPI.
+func (a *App) applyDPI(dpi int32) {
+	if dpi < 72 || dpi == a.dpi {
+		return
+	}
+	a.dpi = dpi
+	a.scale = float64(dpi) / 96.0
+	if a.scale < 1 {
+		a.scale = 1
+	}
+	a.margin = a.px(20)
+	a.gap = a.px(10)
+	h := createFont("Microsoft YaHei UI", 10, false, false, dpi)
+	a.fonts = append(a.fonts, h)
+	a.hFont = h
+	for _, w := range a.widgets {
+		if w.hwnd != 0 && w.font == nil {
+			sendMessage(w.hwnd, wmSetFont, uintptr(h), 1)
+		}
+	}
 }
 
 func (a *App) activate(w *Widget) {
@@ -318,7 +342,11 @@ func (a *App) layoutWindow(win *Widget) {
 }
 
 func isContainerKind(kind string) bool {
-	return kind == "groupbox" || kind == "panel" || kind == "scroll" || kind == "grid"
+	switch kind {
+	case "groupbox", "panel", "scroll", "grid", "toolbar", "splitter", "tabs", "tabpage":
+		return true
+	}
+	return false
 }
 
 func (a *App) containerMargin(kind string) int32 {
@@ -347,9 +375,21 @@ func (a *App) layoutContainer(c *Widget, width, height int32) {
 		return
 	}
 	c.w, c.h = width, height
-	if c.kind == "grid" {
+	switch c.kind {
+	case "grid":
 		a.layoutGrid(c, width, height)
 		return
+	case "toolbar":
+		a.layoutToolbar(c, width, height)
+		return
+	case "splitter":
+		a.layoutSplitter(c, width, height)
+		return
+	case "tabs":
+		a.layoutTabs(c, width, height)
+		return
+	case "tabpage":
+		// A tab page lays out like an ordinary panel.
 	}
 	margin := a.containerMargin(c.kind)
 	cursor := a.containerStart(c.kind)
@@ -895,6 +935,19 @@ func mainWndProc(hwnd, msg, wparam, lparam uintptr) (ret uintptr) {
 		a.removeWindow(a.windowByHWND(h))
 		return 0
 
+	case wmDpiChanged:
+		if win := a.windowByHWND(h); win != nil {
+			dpi := int32(wparam & 0xFFFF)
+			if r := (*rect)(unsafe.Pointer(lparam)); r != nil {
+				pSetWindowPos.Call(uintptr(h), 0, uintptr(r.left), uintptr(r.top),
+					uintptr(r.right-r.left), uintptr(r.bottom-r.top),
+					swpNoZOrder|swpNoActivate)
+			}
+			a.applyDPI(dpi)
+			a.layoutWindow(win)
+		}
+		return 0
+
 	case wmSize:
 		if win := a.windowByHWND(h); win != nil && wparam != 1 { // ignore SIZE_MINIMIZED
 			cw := int32(lparam & 0xFFFF)
@@ -963,6 +1016,11 @@ func mainWndProc(hwnd, msg, wparam, lparam uintptr) (ret uintptr) {
 }
 
 func (w *Widget) command(code int) {
+	if w.tabHeader && w.tabOwner != nil && code == bnClicked {
+		w.tabOwner.activateTab(w.tabIndex)
+		w.emit("click")
+		return
+	}
 	switch w.kind {
 	case "button":
 		if code == bnClicked {

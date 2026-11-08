@@ -49,6 +49,18 @@ type Widget struct {
 	scrollY  int32
 	scrollH  int32
 
+	// Tabs/splitter/toolbar containers.
+	paneA, paneB  *Widget
+	splitRatio    float64
+	splitVertical bool
+	splitDrag     bool
+	tabPages      []*Widget
+	tabButtons    []*Widget
+	activeTab     int
+	tabHeader     bool
+	tabOwner      *Widget
+	tabIndex      int
+
 	groupOldProc uintptr
 
 	title  string
@@ -66,6 +78,9 @@ type Widget struct {
 
 	headers     []string
 	editable    bool
+	virtual     bool
+	virtualRows [][]string
+	virtualBuf  []uint16
 	editHwnd    syscall.Handle
 	editOldProc uintptr
 	editRow     int32
@@ -239,6 +254,12 @@ func (a *App) addChild(kind, class, text string, style uint32, full bool, defW, 
 	container.children = append(container.children, w)
 	container.layoutY = y + displayH + gap
 	sendMessage(hwnd, wmSetFont, uintptr(a.hFont), 1)
+	if a.darkTheme {
+		switch kind {
+		case "listbox", "tree", "table", "edit", "richedit", "combo":
+			setWindowTheme(hwnd, "DarkMode_Explorer", "")
+		}
+	}
 	return w, nil
 }
 
@@ -547,6 +568,20 @@ func (w *Widget) GetProp(name string) (lang.Value, bool) {
 			}
 			return float64(w.imgH), true
 		}
+	case "tabs":
+		switch name {
+		case "active", "index":
+			return float64(w.activeTab), true
+		case "page_count", "count":
+			return float64(len(w.tabPages)), true
+		}
+	case "splitter":
+		switch name {
+		case "ratio":
+			return w.splitRatio, true
+		case "vertical":
+			return w.splitVertical, true
+		}
 	case "tree":
 		switch name {
 		case "selected":
@@ -774,12 +809,18 @@ func (w *Widget) SetProp(name string, v lang.Value) error {
 			w.hasFg, w.fg = true, c
 		} else {
 			w.hasBg, w.bg = true, c
+			w.bgColor = c
 			if w.kind == "window" {
 				w.bgSpec = s
 				w.app.setWindowBackground(w, s)
 				if w.app.window == w {
 					w.app.bgColor = w.bgColor
 				}
+			} else {
+				if w.bgBrush != 0 {
+					deleteObject(w.bgBrush)
+				}
+				w.bgBrush = createBrush(c)
 			}
 		}
 		if w.kind == "button" {
@@ -846,6 +887,37 @@ func (w *Widget) SetProp(name string, v lang.Value) error {
 			invalidateRect(w.hwnd, nil, true)
 			return nil
 		}
+	case "tabs":
+		switch name {
+		case "active", "index":
+			f, ok := v.(float64)
+			if !ok {
+				return fmt.Errorf("active 必须是数字")
+			}
+			w.activateTab(int(f))
+			return nil
+		}
+	case "splitter":
+		switch name {
+		case "ratio":
+			f, ok := v.(float64)
+			if !ok {
+				return fmt.Errorf("ratio 必须是数字")
+			}
+			w.splitRatio = f
+			if w.splitRatio < 0.1 {
+				w.splitRatio = 0.1
+			}
+			if w.splitRatio > 0.9 {
+				w.splitRatio = 0.9
+			}
+			w.app.layoutSplitter(w, w.w, w.h)
+			return nil
+		case "vertical":
+			w.splitVertical = lang.Truthy(v)
+			w.app.layoutSplitter(w, w.w, w.h)
+			return nil
+		}
 	case "tree":
 		switch name {
 		case "items":
@@ -877,6 +949,12 @@ func (w *Widget) SetProp(name string, v lang.Value) error {
 			rows, err := toRows(v)
 			if err != nil {
 				return err
+			}
+			if w.virtual {
+				w.virtualRows = append([][]string(nil), rows...)
+				sendMessage(w.hwnd, lvmSetItemCount, 0, 0)
+				sendMessage(w.hwnd, lvmSetItemCount, uintptr(len(rows)), 0)
+				return nil
 			}
 			sendMessage(w.hwnd, lvmDeleteAllItems, 0, 0)
 			for _, row := range rows {
@@ -1250,6 +1328,49 @@ func (w *Widget) CallMethod(name string, args []lang.Value, kwargs map[string]la
 		}
 		v, err := w.nativeBorderless(args, kwargs)
 		return v, true, err
+	case "add_page":
+		if w.kind != "tabs" {
+			return nil, true, fmt.Errorf("add_page 只能用于 tabs")
+		}
+		page, err := w.addPage(lang.ToString(lang.Pos(args, 0, "页面")))
+		if err != nil {
+			return nil, true, err
+		}
+		return page, true, nil
+	case "page":
+		if w.kind != "tabs" {
+			return nil, true, fmt.Errorf("page 只能用于 tabs")
+		}
+		f, _ := lang.Pos(args, 0, float64(0)).(float64)
+		idx := int(f)
+		if idx < 0 || idx >= len(w.tabPages) {
+			return nil, true, fmt.Errorf("页面下标越界")
+		}
+		return w.tabPages[idx], true, nil
+	case "pane":
+		if w.kind != "splitter" {
+			return nil, true, fmt.Errorf("pane 只能用于 splitter")
+		}
+		f, _ := lang.Pos(args, 0, float64(0)).(float64)
+		p := w.splitterPane(int(f))
+		if p == nil {
+			return nil, true, fmt.Errorf("分栏不存在")
+		}
+		return p, true, nil
+	case "set_prop":
+		if w.kind != "table" {
+			return nil, true, fmt.Errorf("set_prop 只能用于 propertygrid/table")
+		}
+		if len(args) < 2 {
+			return nil, true, fmt.Errorf("set_prop(键, 值) 需要两个参数")
+		}
+		w.setProperty(lang.ToString(args[0]), lang.ToString(args[1]))
+		return nil, true, nil
+	case "get_prop":
+		if w.kind != "table" {
+			return nil, true, fmt.Errorf("get_prop 只能用于 propertygrid/table")
+		}
+		return w.getProperty(lang.ToString(lang.Pos(args, 0, ""))), true, nil
 	case "clear":
 		switch w.kind {
 		case "edit", "richedit":

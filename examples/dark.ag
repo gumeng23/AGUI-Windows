@@ -1,0 +1,17 @@
+win = window("深色控件", 760, 560, theme="dark")
+
+label("深色模式覆盖自绘按钮、输入框、列表、表格和标签页")
+b1 = button("主按钮", w=140)
+b2 = button("危险操作", w=140, fg="#FFFFFF", bg="#DC2626")
+edit("中文输入测试：你好，Agui", w=360)
+check = checkbox("启用通知", checked=true)
+list = listbox(["第一项", "第二项", "第三项"], h=90)
+
+t = table(["名称", "状态"], [["任务 A", "进行中"], ["任务 B", "完成"]], h=120)
+tabs = tabs()
+p1 = tabs.add_page("概览")
+label("这是概览页", parent=p1)
+p2 = tabs.add_page("详情")
+label("这是详情页", parent=p2)
+
+after(2500, quit)

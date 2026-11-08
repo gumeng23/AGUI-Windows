@@ -28,6 +28,7 @@ type Bridge interface {
 	SetVisible(id int, visible bool)
 	SetEnabled(id int, enabled bool)
 	Toast(text string)
+	Alert(title string, message string)
 	Finish()
 	CanvasOps(id int, json string)
 	SaveData(name string, data string)
@@ -35,6 +36,11 @@ type Bridge interface {
 	Share(text string)
 	PickFile(mime string)
 	RequestPermission(name string)
+	OpenURL(url string)
+	Vibrate(ms int)
+	Notify(title string, text string)
+	SetClipboard(text string)
+	GetClipboard() string
 }
 
 // App owns the mobile widget tree and the Agui interpreter.
@@ -356,6 +362,15 @@ func (w *Widget) CallMethod(name string, args []lang.Value, kwargs map[string]la
 			return nil, true, fmt.Errorf("set_checked 需要一个参数")
 		}
 		return nil, true, w.SetProp("checked", args[0])
+	case "add_action":
+		if w.kind != "actionbar" {
+			return nil, true, fmt.Errorf("add_action 只能用于 actionbar")
+		}
+		if len(args) < 1 {
+			return nil, true, fmt.Errorf("add_action 需要标题")
+		}
+		item := w.app.addWidget(w.id, "action", lang.ToString(args[0]), 15, "#FFFFFF")
+		return item, true, nil
 	}
 	return nil, false, nil
 }
@@ -363,7 +378,7 @@ func (w *Widget) CallMethod(name string, args []lang.Value, kwargs map[string]la
 func (w *Widget) Listen(event string, fn func() error) error {
 	switch event {
 	case "click":
-		if w.kind != "button" && w.kind != "window" && w.kind != "image" && w.kind != "label" {
+		if w.kind != "button" && w.kind != "window" && w.kind != "image" && w.kind != "label" && w.kind != "action" {
 			return fmt.Errorf("%s 不支持 click 事件", w.kind)
 		}
 	case "change":

@@ -1,0 +1,33 @@
+win = window("容器与分栏", 920, 830, center=true)
+
+tb = toolbar(h=52)
+button("新建", parent=tb)
+button("打开", parent=tb)
+button("保存", parent=tb)
+label("工具栏", parent=tb, fg="#475569")
+
+sp = splitter(false, h=240)
+left = sp.pane(0)
+right = sp.pane(1)
+label("左侧面板", parent=left)
+edit("可以拖动中间的分隔条", parent=left)
+label("右侧面板", parent=right)
+button("右侧按钮", parent=right)
+
+tabs1 = tabs(h=240)
+p1 = tabs1.add_page("基本信息")
+label("姓名", parent=p1)
+edit("", parent=p1)
+p2 = tabs1.add_page("高级选项")
+checkbox("启用缓存", parent=p2, checked=true)
+checkbox("显示调试信息", parent=p2)
+
+pg = propertygrid(h=150)
+pg.set_prop("名称", "Agui")
+pg.set_prop("版本", "0.9.1")
+pg.set_prop("主题", "浅色")
+
+on win.close:
+    quit()
+
+after(20000, quit)

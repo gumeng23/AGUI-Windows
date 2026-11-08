@@ -14,6 +14,7 @@ const (
 	lvsReport        = 0x0001
 	lvsSingleSel     = 0x0004
 	lvsShowSelAlways = 0x0008
+	lvsOwnerData     = 0x1000
 	lvsExGridLines   = 0x00000001
 	lvsExFullRowSel  = 0x00000020
 	lvsExDoubleBuf   = 0x00010000
@@ -34,6 +35,7 @@ const (
 	lvmSetTextBkColor   = 0x1026
 	lvmEnsureVisible    = 0x1013
 	lvmGetSubitemRect   = 0x1038
+	lvmSetItemCount     = 0x102F
 	lvirBounds          = 0
 
 	lvcfFmt      = 0x0001
@@ -50,6 +52,7 @@ const (
 
 	lvnItemChanged = 0xFFFFFF9B // -101
 	lvnColumnClick = 0xFFFFFF94 // -108
+	lvnGetDispInfo = 0xFFFFFF4F // -177 (LVN_GETDISPINFOW)
 	nmClick        = 0xFFFFFFFE // -2
 	nmDblClk       = 0xFFFFFFFD // -3
 )
@@ -94,6 +97,11 @@ type nmhdr struct {
 	code     uint32
 }
 
+type lvDispInfoW struct {
+	hdr  nmhdr
+	item lvItemW
+}
+
 type nmItemActivate struct {
 	hdr       nmhdr
 	iItem     int32
@@ -105,17 +113,28 @@ type nmItemActivate struct {
 	lParam    uintptr
 }
 
-func (a *App) createTable(headers []string, rows [][]string, x, y, w, h *int32) (*Widget, error) {
+func (a *App) createTable(headers []string, rows [][]string, x, y, w, h *int32, virtual bool) (*Widget, error) {
 	style := uint32(lvsReport | lvsSingleSel | lvsShowSelAlways | wsBorder | wsTabStop)
+	if virtual {
+		style |= lvsOwnerData
+	}
 	t, err := a.addChild("table", "SysListView32", "", style, true, 0, a.px(220), x, y, w, h)
 	if err != nil {
 		return nil, err
 	}
 	sendMessage(t.hwnd, lvmSetExtendedStyle, uintptr(lvsExGridLines|lvsExFullRowSel|lvsExDoubleBuf), uintptr(lvsExGridLines|lvsExFullRowSel|lvsExDoubleBuf))
 	t.editable = true
+	t.virtual = virtual
+	if virtual {
+		t.virtualRows = append([][]string(nil), rows...)
+	}
 	t.setHeaders(headers)
-	for _, row := range rows {
-		t.addRow(row)
+	if virtual {
+		sendMessage(t.hwnd, lvmSetItemCount, uintptr(len(t.virtualRows)), 0)
+	} else {
+		for _, row := range rows {
+			t.addRow(row)
+		}
 	}
 	return t, nil
 }
@@ -124,8 +143,11 @@ func (w *Widget) setHeaders(headers []string) {
 	if w.kind != "table" {
 		return
 	}
-	rows := w.tableRows()
-	sendMessage(w.hwnd, lvmDeleteAllItems, 0, 0)
+	var rows *lang.List
+	if !w.virtual {
+		rows = w.tableRows()
+		sendMessage(w.hwnd, lvmDeleteAllItems, 0, 0)
+	}
 	for i := w.cols - 1; i >= 0; i-- {
 		sendMessage(w.hwnd, lvmDeleteColumn, uintptr(i), 0)
 	}
@@ -148,6 +170,10 @@ func (w *Widget) setHeaders(headers []string) {
 		}
 		sendMessage(w.hwnd, lvmInsertColumnW, uintptr(i), uintptr(unsafe.Pointer(&col)))
 	}
+	if w.virtual {
+		sendMessage(w.hwnd, lvmSetItemCount, uintptr(len(w.virtualRows)), 0)
+		return
+	}
 	for _, rv := range rows.Items {
 		row, ok := rv.(*lang.List)
 		if !ok {
@@ -165,6 +191,11 @@ func (w *Widget) addRow(cells []string) {
 	if w.kind != "table" || len(cells) == 0 {
 		return
 	}
+	if w.virtual {
+		w.virtualRows = append(w.virtualRows, append([]string(nil), cells...))
+		sendMessage(w.hwnd, lvmSetItemCount, uintptr(len(w.virtualRows)), 0)
+		return
+	}
 	text := u16(cells[0])
 	item := lvItemW{mask: lvifText, iItem: int32(sendMessage(w.hwnd, lvmGetItemCount, 0, 0)), pszText: text}
 	sendMessage(w.hwnd, lvmInsertItemW, 0, uintptr(unsafe.Pointer(&item)))
@@ -177,6 +208,16 @@ func (w *Widget) setTableCell(row, col int32, text string) {
 	if w.kind != "table" || row < 0 || col < 0 {
 		return
 	}
+	if w.virtual {
+		if int(row) < len(w.virtualRows) {
+			for len(w.virtualRows[row]) <= int(col) {
+				w.virtualRows[row] = append(w.virtualRows[row], "")
+			}
+			w.virtualRows[row][col] = text
+			invalidateRect(w.hwnd, nil, true)
+		}
+		return
+	}
 	item := lvItemW{mask: lvifText, iItem: row, iSubItem: col, pszText: u16(text)}
 	sendMessage(w.hwnd, lvmSetItemTextW, uintptr(row), uintptr(unsafe.Pointer(&item)))
 }
@@ -184,6 +225,15 @@ func (w *Widget) setTableCell(row, col int32, text string) {
 func (w *Widget) tableCell(row, col int) string {
 	if w.kind != "table" {
 		return ""
+	}
+	if w.virtual {
+		if row < 0 || row >= len(w.virtualRows) {
+			return ""
+		}
+		if col < 0 || col >= len(w.virtualRows[row]) {
+			return ""
+		}
+		return w.virtualRows[row][col]
 	}
 	buf := make([]uint16, 1024)
 	item := lvItemW{
@@ -219,6 +269,9 @@ func (w *Widget) tableSelect(idx int) {
 
 func (w *Widget) tableRows() *lang.List {
 	n := int(sendMessage(w.hwnd, lvmGetItemCount, 0, 0))
+	if w.virtual {
+		n = len(w.virtualRows)
+	}
 	out := &lang.List{Items: make([]lang.Value, 0, n)}
 	for r := 0; r < n; r++ {
 		row := &lang.List{}
@@ -261,6 +314,25 @@ func (w *Widget) tableSort(col int, asc bool) {
 		return
 	}
 	w.commitCellEdit(true)
+	if w.virtual {
+		sort.SliceStable(w.virtualRows, func(i, j int) bool {
+			a, b := "", ""
+			if col < len(w.virtualRows[i]) {
+				a = w.virtualRows[i][col]
+			}
+			if col < len(w.virtualRows[j]) {
+				b = w.virtualRows[j][col]
+			}
+			if asc {
+				return tableLess(a, b)
+			}
+			return tableLess(b, a)
+		})
+		sendMessage(w.hwnd, lvmSetItemCount, 0, 0)
+		sendMessage(w.hwnd, lvmSetItemCount, uintptr(len(w.virtualRows)), 0)
+		w.sortCol, w.sortAsc = col, asc
+		return
+	}
 	rows := w.tableRows()
 	sort.SliceStable(rows.Items, func(i, j int) bool {
 		a := tableRowString(rows.Items[i], col)
@@ -439,6 +511,19 @@ func (w *Widget) tableNotify(code uint32, lparam uintptr) bool {
 		return false
 	}
 	switch code {
+	case lvnGetDispInfo:
+		di := (*lvDispInfoW)(unsafe.Pointer(lparam))
+		if w.virtual {
+			row, col := int(di.item.iItem), int(di.item.iSubItem)
+			text := ""
+			if row >= 0 && row < len(w.virtualRows) && col >= 0 && col < len(w.virtualRows[row]) {
+				text = w.virtualRows[row][col]
+			}
+			w.virtualBuf = syscall.StringToUTF16(text)
+			di.item.pszText = &w.virtualBuf[0]
+			di.item.cchTextMax = int32(len(w.virtualBuf))
+		}
+		return true
 	case lvnItemChanged:
 		nia := (*nmItemActivate)(unsafe.Pointer(lparam))
 		if nia.uNewState&lvniSelected != 0 && nia.uOldState&lvniSelected == 0 {

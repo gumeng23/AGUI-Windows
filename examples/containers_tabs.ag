@@ -1,0 +1,13 @@
+win = window("标签页切换", 520, 380, center=true)
+
+t = tabs(h=260)
+p1 = t.add_page("第一页")
+label("这是第一页", parent=p1)
+edit("第一页内容", parent=p1)
+
+p2 = t.add_page("第二页")
+label("这是第二页", parent=p2)
+button("第二页按钮", parent=p2)
+
+t.active = 1
+after(60000, quit)

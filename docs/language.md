@@ -437,6 +437,7 @@ win = window("标题", w=900, h=640, bg="#F7F8FA", resizable=true)
 - 每次调用 `window()` 都会创建一个新的顶层窗口；用 `win.use()` / `win.activate()` 切换后续控件默认放入哪个窗口。
 - `w` / `h` 是**客户区**尺寸（不含标题栏和边框）。
 - 坐标和尺寸使用逻辑像素（96 DPI 基准）；在高 DPI 屏幕上 Agui 会按系统 DPI 缩放。
+- Windows 10 1703+ 默认启用 Per-Monitor V2 DPI 感知；窗口拖到不同缩放的显示器时会收到 `WM_DPICHANGED`，重新创建默认字体并重排子控件。自定义字体不会自动重建。
 - 窗口默认使用系统默认位置，可以用 `win.center()` 居中。
 
 ### 9.2 自动布局
@@ -1146,6 +1147,17 @@ t.end_edit(true)          # 提交；false 取消
 
 事件：`select`、`click`、`dblclick`、`edit`。`edit` 在单元格保存后触发，可以用 `t.selected` 和 `t.get_cell(...)` 读取结果。
 
+数据量较大时使用虚拟表格，只渲染当前可见行：
+
+```agui
+rows = []
+for i in range(100000):
+    rows.append([str(i), "第 " + str(i) + " 行"])
+t = table(["编号", "内容"], rows, virtual=true, h=420)
+```
+
+虚拟模式下 `row_count` 仍是完整行数，滚动条按总行数计算；`set_cell`、`sort`、`rows` 直接操作内存中的行数据，不创建对应数量的 Win32 列表项。虚拟表格仍可选中和双击编辑，但编辑框定位以当前可见区域为准。
+
 ### 16.9 视觉样式与自绘按钮
 
 Agui 启动时通过 activation context 激活 Common Controls v6，按钮、复选框、滚动条等跟随系统现代主题，不需要额外清单文件。
@@ -1378,6 +1390,35 @@ ok = button("确定", anchor="right bottom", x=20, y=20, w=120, h=36)
 - `anchor` 支持 `left`、`right`、`top`、`bottom` 及其组合；`right bottom` 贴右下，`left right` 横向拉伸，`top bottom` 纵向拉伸。
 - `visible=false` 的控件不显示也不占位；恢复显示会重新布局父容器。
 - 修改容器尺寸或窗口缩放会触发递归重排。
+
+常用复合容器：
+
+```agui
+bar = toolbar(h=44)
+button("新建", w=90, parent=bar)
+button("打开", w=90, parent=bar)
+
+sp = splitter(vertical=false, h=240)
+left = sp.pane(0)
+right = sp.pane(1)
+label("左侧", parent=left)
+label("右侧", parent=right)
+
+tabs = tabs(h=240)
+p1 = tabs.add_page("概览")
+label("第一页", parent=p1)
+p2 = tabs.add_page("详情")
+label("第二页", parent=p2)
+tabs.active = 1
+
+pg = propertygrid([["名称", "Agui"], ["版本", "0.9"]], h=120)
+```
+
+- `toolbar()`：横向排列子控件，适合按钮条。
+- `splitter(vertical=false)`：左右或上下分栏，拖动中间 6px 分隔条调整比例；`pane(0)` / `pane(1)` 取得两栏容器，`ratio` 读写比例（0.1–0.9）。
+- `tabs()`：`add_page(title)` 创建页面容器并返回，`active` 切换当前页；页面内控件用 `parent=页面对象`。
+- `propertygrid(rows)`：两列表格封装，`set_prop(name, value)` / `get_prop(name)` 读写属性行。
+- 这些容器都可以嵌套 panel、groupbox、grid 等。
 
 ### 16.20 GUI 补充控件
 
@@ -1748,7 +1789,9 @@ win = window("星野养成", w=420, h=640)
 - `#target windows` 为缺省值；只允许一个 `#target`，且必须在代码之前。
 - `#name` 是应用显示名；`#package` 是 Android 包名；`#version` 是版本名；`#icon` 支持 PNG 路径（相对脚本目录）或 data URI；`#permission android.permission.CAMERA` 可重复，声明运行时权限。
 - `agui build app.ag` 生成 `app.exe` 或 `app.apk`；`agui check app.ag` 会校验文件头与包名。
-- Android 端使用原生 View，不使用 WebView；支持 `window/panel/label/button/edit/checkbox/progress/image`，事件 `click/change/close`，以及 `after/every/cancel_timer/quit/toast`。
+- Android 端使用原生 View，不使用 WebView；支持 `window/actionbar/panel/label/button/edit/checkbox/progress/image`，事件 `click/change/close`，以及 `after/every/cancel_timer/quit/toast/alert`。
+- `actionbar(title)` 创建顶部应用栏，`bar.add_action("刷新")` 返回一个可监听 `click` 的菜单按钮；适合放置返回、刷新、关于等常用操作。
+- 系统能力：`share(text)`、`open_url(url)`、`vibrate(毫秒)`、`notify(title, text)`、`clipboard()`、`set_clipboard(text)`；通知和震动需要在文件头用 `#permission` 声明 `POST_NOTIFICATIONS`/`VIBRATE`（Android 13+ 通知还需运行时授权）。
 - 构建 Android 需要 `android/runtime/agui.aar`（由 `gomobile bind ... ./mobile` 生成）以及 SDK/JDK；`--asset` 可把额外资源打进 APK。
 - 当前 Native 后端只支持 arm64-v8a；未支持 `menu/tray/table/tree` 等 Windows 专属能力。
 - 原生 Canvas/Game Kit 子集已支持：`canvas`、`game_loop`、触摸、`camera`、`aabb`、`save_json/load_json`；完整 Game Kit 仍以 Windows 为准。

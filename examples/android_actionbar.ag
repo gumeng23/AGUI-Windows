@@ -1,0 +1,31 @@
+#target android
+#name Agui 原生控件
+#package com.agui.actionbar
+#version 0.1.0
+#permission android.permission.VIBRATE android.permission.POST_NOTIFICATIONS
+
+win = window("Agui 原生控件")
+
+bar = actionbar("Agui 原生")
+about = bar.add_action("关于")
+refresh = bar.add_action("刷新")
+
+on about.click:
+    alert("关于 Agui", "原生 ActionBar、标准对话框与 Android View 运行时。")
+
+on refresh.click:
+    status.text = "已刷新（" + str(len(items)) + " 项）"
+    vibrate(80)
+    notify("Agui 原生", "列表已刷新")
+    set_clipboard("Agui Android")
+
+title = label("原生 View 组件", size=24, fg="#9A3412")
+status = label("点击右上角菜单", size=14, fg="#78716C")
+
+items = ["相机", "定位", "通知", "分享"]
+for name in items:
+    label("• " + name, size=16)
+
+button("返回", w=120)
+on win.close:
+    toast("再见")

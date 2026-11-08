@@ -28,6 +28,19 @@ func registerUI(i *lang.Interp, a *App) {
 		return w, nil
 	})
 
+	reg("actionbar", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("actionbar", args, 0, 1); err != nil {
+			return nil, err
+		}
+		title := "Agui"
+		if len(args) > 0 {
+			title = lang.ToString(args[0])
+		}
+		w := a.addWidget(0, "actionbar", title, 19, "#FFFFFF")
+		applyKw(a, w, kw)
+		return w, nil
+	})
+
 	reg("panel", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
 		if err := argCount("panel", args, 0, 0); err != nil {
 			return nil, err
@@ -131,6 +144,20 @@ func registerUI(i *lang.Interp, a *App) {
 		return m, nil
 	})
 
+	reg("alert", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("alert", args, 1, 2); err != nil {
+			return nil, err
+		}
+		title := "提示"
+		msg := lang.ToString(args[0])
+		if len(args) > 1 {
+			title = lang.ToString(args[0])
+			msg = lang.ToString(args[1])
+		}
+		a.bridge.Alert(title, msg)
+		return nil, nil
+	})
+
 	reg("toast", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
 		if err := argCount("toast", args, 1, 1); err != nil {
 			return nil, err
@@ -177,15 +204,48 @@ func registerUI(i *lang.Interp, a *App) {
 	})
 
 	reg("clipboard", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
-		return "", nil
+		return a.bridge.GetClipboard(), nil
 	})
 
 	reg("set_clipboard", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("set_clipboard", args, 1, 1); err != nil {
+			return nil, err
+		}
+		a.bridge.SetClipboard(lang.ToString(args[0]))
 		return nil, nil
 	})
 
 	reg("open_url", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
-		a.bridge.Toast("此版本不支持打开链接")
+		if err := argCount("open_url", args, 1, 1); err != nil {
+			return nil, err
+		}
+		a.bridge.OpenURL(lang.ToString(args[0]))
+		return nil, nil
+	})
+
+	reg("vibrate", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		ms := 200
+		if len(args) > 0 {
+			ms = int(number(args[0]))
+		}
+		if ms < 1 {
+			ms = 1
+		}
+		a.bridge.Vibrate(ms)
+		return nil, nil
+	})
+
+	reg("notify", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("notify", args, 1, 2); err != nil {
+			return nil, err
+		}
+		title := "Agui"
+		msg := lang.ToString(args[0])
+		if len(args) > 1 {
+			title = lang.ToString(args[0])
+			msg = lang.ToString(args[1])
+		}
+		a.bridge.Notify(title, msg)
 		return nil, nil
 	})
 
