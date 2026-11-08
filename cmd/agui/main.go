@@ -19,7 +19,7 @@ import (
 	"agui/internal/winres"
 )
 
-const version = "0.9.3"
+const version = "0.9.4"
 
 // embedMagic marks a trailing script appended by `agui build`.
 const embedMagic = "AGUIEMB\x01"

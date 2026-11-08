@@ -4,13 +4,13 @@
 [![License](https://img.shields.io/github/license/gumeng23/AGUI-Windows)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android-0078D4)
 
-Agui 是一门轻量、解释执行的脚本语言。它用接近 Python 的缩进语法，直接创建**原生 Windows 控件**，也能把同一份脚本构建成 **原生 Android 应用**；不需要 Electron、浏览器或额外运行时。解释器本身由 Go 写成，Windows 侧直调 Win32 API，Android 侧经 gomobile 调原生 View。当前版本 **0.9.3**。
+Agui 是一门轻量、解释执行的脚本语言。它用接近 Python 的缩进语法，直接创建**原生 Windows 控件**，也能把同一份脚本构建成 **原生 Android 应用**；不需要 Electron、浏览器或额外运行时。解释器本身由 Go 写成，Windows 侧直调 Win32 API，Android 侧经 gomobile 调原生 View。当前版本 **0.9.4**。
 
 ## 下载即用
 
 不想装任何东西：下载、解压，即可运行（绿色版，不写注册表）。
 
-1. **下载** [Agui-0.9.3-win64.zip](https://github.com/gumeng23/AGUI-Windows/releases/latest)（约 14 MB，含 `agui.exe`、`aguiw.exe`、全部示例与文档）
+1. **下载** [Agui-0.9.4-win64.zip](https://github.com/gumeng23/AGUI-Windows/releases/latest)（约 14 MB，含 `agui.exe`、`aguiw.exe`、全部示例与文档）
 2. **解压**到任意目录 —— 绿色版，不写注册表，不需要管理员权限
 3. 在该目录打开 PowerShell，三条命令：
 

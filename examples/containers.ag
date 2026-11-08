@@ -24,7 +24,7 @@ checkbox("显示调试信息", parent=p2)
 
 pg = propertygrid(h=150)
 pg.set_prop("名称", "Agui")
-pg.set_prop("版本", "0.9.3")
+pg.set_prop("版本", "0.9.4")
 pg.set_prop("主题", "浅色")
 
 on win.close:
