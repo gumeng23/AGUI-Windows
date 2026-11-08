@@ -7,6 +7,13 @@ name: Pages
 on:
   push:
     branches: [main]
+    paths:
+      - "web/**"
+      - "cmd/aguiweb/**"
+      - "internal/**"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:

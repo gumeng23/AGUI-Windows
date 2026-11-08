@@ -33,3 +33,6 @@
 /vscode-agui/node_modules/
 /vscode-agui/out/
 /vscode-agui/*.vsix
+
+# 本地临时脚本
+/.tmp/
