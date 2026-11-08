@@ -24,6 +24,8 @@ Agui 是一门轻量、解释执行的脚本语言。它用接近 Python 的缩�
 
 想从零建一个项目：`.\agui.exe init 我的工具`。
 
+**在线示例**：<https://gumeng23.github.io/AGUI-Windows/> —— 浏览器里直接跑 WASM 版《星野养成》，不用下载。
+
 ![Agui 窗口示例](docs/images/hello.png)
 
 ```agui

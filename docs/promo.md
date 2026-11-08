@@ -14,10 +14,10 @@
 | 场合 | 一句话 |
 | --- | --- |
 | 主定位 | **写 Windows 小工具，最短的一条路：10 行脚本，双击 exe。** |
-| 对 Python 用户 | 你的脚本缺个界面？tkinter 丑、PyQt 打包 60MB、Electron 更重——Agui 打包出来 11MB，原生控件。 |
+| 对 Python 用户 | 你的脚本缺个界面？tkinter 丑、PyQt 打包 60MB、Electron 更重——Agui 打包出来 12MB，原生控件。 |
 | 对非程序员 | 不用装环境、不用编译，改一行字就能改界面，做出来的就是一个 exe，发给谁都能用。 |
 
-**核心记忆点（只讲一个）**：`10 行脚本 → 11MB 单文件 exe → 双击就跑，零依赖。`
+**核心记忆点（只讲一个）**：`10 行脚本 → 12MB 单文件 exe → 双击就跑，零依赖。`
 其他特性（Game Kit、中文关键字、Android）是第二层信息，第一次接触不讲。
 
 ### 竞品坐标（必须提前想好，评论区一定会问）
@@ -25,7 +25,7 @@
 | | Agui | aardio | 易语言 | Python+PyQt | Electron |
 | --- | --- | --- | --- | --- | --- |
 | 学习曲线 | 类 Python 缩进 | 中 | 低（中文） | 低 | 中 |
-| 打包体积 | **~11 MB** | ~2–5 MB | ~5–10 MB | 40–80 MB | 120–200 MB |
+| 打包体积 | **~12 MB** | ~2–5 MB | ~5–10 MB | 40–80 MB | 120–200 MB |
 | 原生控件 | ✅ Win32 | ✅ | ✅ | ✅（Qt 非原生但好看） | ❌ 网页 |
 | 开源 | ✅ MIT | 免费闭源 | 商业 | ✅ | ✅ |
 | 生态/库 | ❌ 弱 | ✅ 强 | ✅ 中 | ✅ 极强 | ✅ 极强 |
@@ -39,17 +39,17 @@
 
 按投入产出排序，P0 全部可在一天内完成：
 
-| 优先级 | 现状 | 要改成 |
-| --- | --- | --- |
-| P0 | 想跑必须先装 Go 1.22+ 再 `build.bat` | **GitHub Releases 放 `agui.exe` + 3 个示例 exe**，README 顶部一个大按钮「下载即用」 |
-| P0 | 仓库描述是「…制作于 deepseek flash 4.1」 | 改成 `A tiny scripting language for native Windows GUI apps — 10 lines to a 11 MB standalone .exe.`。**不要提 AI 生成**：它会让读者把项目归类为玩具，且给 HN 评论区递刀 |
-| P0 | 无在线试玩 | 用现成的 `web/`（WASM 12MB）开 GitHub Pages，做一个「浏览器里改代码看效果」的 playground。这是最低成本、最高传播率的资产 |
-| P0 | 无 topics、无主页 | topics 加 `windows` `gui` `programming-language` `interpreter` `golang` `win32` `scripting` `chinese`；主页填 Pages 地址 |
-| P1 | `aguicode.zip`（66MB）提交在仓库里 | 从 HEAD 移除（历史可保留），否则 clone 要 32MB，第一印象就是「不规范」 |
-| P1 | 只有中文 README | 加 `README.en.md`，首屏同结构。英文版不用长，够 Reddit/HN 点进来 |
-| P1 | README 很长（864 行）但首屏没有「30 秒看懂」 | 首屏改成：一句话 + GIF + 下载/试玩按钮 + 最小示例，语言参考挪到 docs |
-| P2 | 无 issue 模板、无 CI 徽章 | 加 `go test` CI 徽章、issue 模板、`CONTRIBUTING.md`——这些是「项目还活着」的信号 |
-| P2 | VS Code 扩展未上 Marketplace | 发布到 Marketplace 并写进 README，等于多一个搜索入口 |
+| 优先级 | 现状 | 要改成 | 状态（2026-11-08） |
+| --- | --- | --- | --- |
+| P0 | 想跑必须先装 Go 1.22+ 再 `build.bat` | **GitHub Releases 放 `agui.exe` + 示例 exe**，README 顶部一个大按钮「下载即用」 | ✅ v0.9.1 发布 3 个资产；README 首屏已加「下载即用」（check/run/build 三条命令），「快速开始」下沉为「从源码构建」 |
+| P0 | 仓库描述是「…制作于 deepseek flash 4.1」 | 中英双语，点明「12 MB 单文件 exe / 零运行时」，**不要提 AI 生成** | ✅ 已改（中文 + English），topics 10 个已加 |
+| P0 | 无在线试玩 | `web/`（WASM）走 GitHub Pages | ✅ <https://gumeng23.github.io/AGUI-Windows/> 已上线，workflow 见 `.github/workflows/pages.yml` |
+| P0 | 无主页链接 | 仓库右侧 Homepage 填 Pages 地址 | ⚠️ **仍未填**（Pages 已通，填上等于多一个入口） |
+| P1 | `aguicode.zip`（66MB）提交在仓库里 | 从 HEAD 移除（历史可保留） | ✅ 已移除 |
+| P1 | README 很长但首屏没有「30 秒看懂」 | 首屏：一句话 + GIF + 下载/试玩 + 最小示例 | 🟡 一句话、下载、试玩、示例都齐了，**GIF 仍缺**（静态图讲不出「脚本→窗口」的落差） |
+| P1 | 只有中文 README | 加 `README.en.md`，首屏同结构 | ⬜ 未做 |
+| P2 | 无 issue 模板、无 CI 徽章 | 加 `go test` CI 徽章、issue 模板、`CONTRIBUTING.md` | ⬜ 未做 |
+| P2 | VS Code 扩展未上 Marketplace | 发布到 Marketplace 并写进 README | ⬜ 未做（本地已有 `agui-0.1.0.vsix`） |
 
 **关键判断**：一个陌生访客的耐心约 30 秒。当前路径是「clone → 装 Go → 编译 → 找示例」，流失率 >95%。修完 P0，同样一篇帖子带来的留存能翻几倍。
 
@@ -100,7 +100,7 @@
 
 | 顺序 | 渠道 | 写法要点 |
 | --- | --- | --- |
-| 1 | **V2EX / 分享创造** | 标题带结果：`写了个 Windows 小工具语言，10 行代码打包成 11MB 的 exe`。正文自嘲 + 求骂，V2EX 吃这套；**必须贴在线试玩和 exe 下载** |
+| 1 | **V2EX / 分享创造** | 标题带结果：`写了个 Windows 小工具语言，10 行代码打包成 12MB 的 exe`。正文自嘲 + 求骂，V2EX 吃这套；**必须贴在线试玩和 exe 下载** |
 | 2 | **掘金 / 知乎** | 文章体：《我为什么又造了一门语言：用 Go + Win32 做 GUI 脚本》。讲取舍（为什么不用 Electron、为什么缩进、为什么中文关键字），开发者爱看「决策过程」 |
 | 3 | **少数派** | 面向普通用户：《不装任何环境，做一个自己的 Windows 小工具》。配 GIF，讲成品，不讲实现 |
 | 4 | **B 站** | 3–5 分钟：从空白到 exe，全程录屏无剪辑。标题 `10 行代码做个 Windows 软件` |
@@ -109,7 +109,7 @@
 
 | 渠道 | 写法要点 |
 | --- | --- |
-| **Show HN** | 标题 `Show HN: A scripting language that compiles to a 11 MB native Windows exe`。首发要有 playground 链接（HN 用户不下载东西）。准备好回答「为什么不用 C#/WinForms」「为什么不用 Tauri」 |
+| **Show HN** | 标题 `Show HN: A scripting language that compiles to a 12 MB native Windows exe`。首发要有 playground 链接（HN 用户不下载东西）。准备好回答「为什么不用 C#/WinForms」「为什么不用 Tauri」 |
 | **Reddit r/golang** | 角度换成实现：`I wrote a tree-walking interpreter + Win32 GUI bindings in pure Go, no cgo`。Go 社区对「无 cgo 的 Win32 绑定」真的感兴趣 |
 | **Reddit r/programming** | 慎重，氛围偏苛刻。等有 100+ star 再发 |
 | **Lobsters** | 小而精，适合「语言设计取舍」类文章 |
@@ -127,7 +127,7 @@
 
 ### V2EX（分享创造）
 
-> **写了个 Windows 小工具语言，10 行代码打包成 11MB 的 exe**
+> **写了个 Windows 小工具语言，10 行代码打包成 12MB 的 exe**
 >
 > 起因很俗：我想给几个小脚本加界面。tkinter 太丑，PyQt 打包 60MB，Electron 更别说了。于是自己写了一门解释型语言，Go + Win32，语法长这样：
 >
@@ -140,7 +140,7 @@
 >     msgbox("你好，" + name.text + "！")
 > ```
 >
-> `agui build hello.ag -o hello.exe` 之后得到一个 11MB 的单文件，双击就跑，不需要任何运行时。控件都是原生 Win32，跟随系统主题。
+> `agui build hello.ag -o hello.exe` 之后得到一个 12MB 的单文件，双击就跑，不需要任何运行时。控件都是原生 Win32，跟随系统主题。
 >
 > 在线试玩：<链接> ｜ 下载：<Release 链接> ｜ 源码：<GitHub>
 >
@@ -157,7 +157,7 @@
 
 ### Show HN
 
-> **Show HN: A scripting language that builds native Windows GUI apps into one 11 MB exe**
+> **Show HN: A scripting language that builds native Windows GUI apps into one 12 MB exe**
 >
 > Agui is a tree-walking interpreter written in pure Go (no cgo) that binds Win32 directly. You write indented, Python-like scripts; `agui build app.ag` appends your script and assets to the interpreter binary, producing a single self-contained .exe with no runtime dependency.
 >
@@ -171,7 +171,7 @@
 
 | 质疑 | 回应 |
 | --- | --- |
-| 「为什么不用 C#/WinForms？」 | 不用编译、不用 SDK，改一行字就能改界面，而且产物是一个 11MB 的 exe 而不是一堆依赖。目标用户是「不想开 Visual Studio 的人」。 |
+| 「为什么不用 C#/WinForms？」 | 不用编译、不用 SDK，改一行字就能改界面，而且产物是一个 12MB 的 exe 而不是一堆依赖。目标用户是「不想开 Visual Studio 的人」。 |
 | 「AI 写的吧？」 | 是，我主导设计并用 AI 加速实现；测试、示例、API 设计都是人工迭代的。→ 然后立刻把话题拉回「你用不用得上」，不辩解。 |
 | 「生态太弱，不如 Python」 | 对，它不打算替代 Python。它只解决「脚本要个界面」这一件事。 |
 | 「Windows only 是死路」 | 现阶段是取舍。WASM 版已经能跑，跨平台等有人真的需要再说。 |
@@ -194,5 +194,5 @@
 
 ## 七、一句话总结
 
-> 别宣传「一门新语言」，宣传「一个 11MB、双击就能用的小工具」；
+> 别宣传「一门新语言」，宣传「一个 12MB、双击就能用的小工具」；
 > 先把「点进来 → 30 秒内跑起来」这条路修通，再谈传播。
