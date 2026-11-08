@@ -1,0 +1,16 @@
+win = window("IME 与无障碍", 640, 520, center=true)
+
+label("普通输入框（支持中文 IME 组合输入）")
+name_edit = edit("", w=560)
+name_edit.name = "姓名输入框"
+
+label("富文本编辑框")
+notes = richedit("第一行\n第二行", w=560, h=120)
+notes.name = "备注编辑框"
+
+label("自绘控件也会暴露无障碍名称")
+pic = canvas(w=560, h=180)
+pic.name = "示例画布"
+pic.circle(280, 90, 40, "#DC2626")
+
+after(20000, quit)

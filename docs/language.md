@@ -1442,6 +1442,18 @@ button("悬停查看提示", tooltip="这是一个原生 tooltip")
 - 窗口属性：`center=true` 启动时居中；`topmost` 置顶；`opacity` 0.0–1.0；`state` 为 `normal` / `maximized` / `minimized`；方法 `center()`、`flash()`。
 - 状态栏、日期、时间、单选按钮同样参与自动布局；状态栏不占纵向流。
 
+**IME 与无障碍名称**：`edit`、`richedit` 使用原生 Win32 编辑控件，中文输入法组合输入由系统处理，无需额外配置。所有控件支持 `name` / `caption` 通用属性，写入窗口文本：
+
+```agui
+e = edit("", w=400)
+e.name = "姓名输入框"
+
+c = canvas(w=400, h=200)
+c.name = "游戏画布"
+```
+
+普通 Win32 控件（按钮、编辑框、表格等）由系统提供 UIA 名称；自绘的 `canvas`、`image` 通过 `name` 暴露名称，UIA 会显示为 `Pane`。当前没有为自绘控件实现完整的 `IAccessible` 子节点/角色，`canvas` 内部图形仍不能逐个被读屏软件枚举。
+
 ### 16.21 HTTP 客户端增强
 
 ```agui

@@ -37,6 +37,7 @@ func (a *App) createCanvas(x, y, w, h *int32) (*Widget, error) {
 	if err != nil {
 		return nil, err
 	}
+	setWindowText(widget.hwnd, "画布")
 	return widget, nil
 }
 

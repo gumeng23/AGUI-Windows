@@ -457,6 +457,8 @@ func (w *Widget) GetProp(name string) (lang.Value, bool) {
 		return w.app.logical(w.scrollY), true
 	case "scroll_height":
 		return w.app.logical(w.scrollH), true
+	case "name", "caption":
+		return getWindowText(w.hwnd), true
 	case "tooltip":
 		return w.tooltip, true
 	case "tooltip_visible":
@@ -750,6 +752,9 @@ func (w *Widget) setGeometry(prop string, val float64) error {
 // SetProp implements lang.Widget.
 func (w *Widget) SetProp(name string, v lang.Value) error {
 	switch name {
+	case "name", "caption":
+		setWindowText(w.hwnd, lang.ToString(v))
+		return nil
 	case "x", "y", "w", "h", "width", "height":
 		f, ok := v.(float64)
 		if !ok {
@@ -1759,6 +1764,7 @@ func (a *App) createImage(path string, x, y, w, h *int32) (*Widget, error) {
 		return nil, err
 	}
 	widget.imgFit = true
+	setWindowText(widget.hwnd, "图片")
 	if path != "" {
 		if err := widget.loadImage(path); err != nil {
 			return nil, err
