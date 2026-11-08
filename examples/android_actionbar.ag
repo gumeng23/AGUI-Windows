@@ -63,6 +63,23 @@ on loc.click:
 on win.file:
     status.text = "文件：" + win.last_file
 
+rec = button("开始录音")
+on rec.click:
+    start_record()
+    status.text = "录音中……"
+
+stoprec = button("停止录音")
+on stoprec.click:
+    stop_record()
+
+acc = button("读取加速度")
+on acc.click:
+    v = sensor("accelerometer")
+    if v == "":
+        status.text = "暂无加速度数据"
+    else:
+        status.text = "加速度：" + v
+
 perm = button("申请相机/麦克风权限组")
 on perm.click:
     request_permissions("android.permission.CAMERA", "android.permission.RECORD_AUDIO")

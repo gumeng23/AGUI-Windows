@@ -17,6 +17,11 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -53,7 +58,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class MainActivity extends Activity implements Bridge {
     private LinearLayout root;
@@ -64,6 +71,11 @@ public class MainActivity extends Activity implements Bridge {
     private static final int REQ_PICK = 43;
     private static final int REQ_PERM = 44;
     private static final int REQ_CAMERA = 46;
+    private MediaRecorder recorder;
+    private String recordingPath;
+    private SensorManager sensorManager;
+    private final Map<String, float[]> sensorValues = new HashMap<>();
+    private final Set<String> sensorRegistered = new HashSet<>();
     private static final int REQ_SAVE = 45;
     private String pendingSaveContent = "";
 
@@ -717,6 +729,80 @@ public class MainActivity extends Activity implements Bridge {
         } catch (Exception e) {
             return "";
         }
+    }
+
+    @Override public void startRecording() {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                if (recorder != null) return;
+                try {
+                    recordingPath = new File(getCacheDir(),
+                            "agui-record-" + System.currentTimeMillis() + ".3gp").getAbsolutePath();
+                    recorder = new MediaRecorder();
+                    recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+                    recorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
+                    recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+                    recorder.setOutputFile(recordingPath);
+                    recorder.prepare();
+                    recorder.start();
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, "录音启动失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+                    if (recorder != null) { recorder.release(); recorder = null; }
+                    recordingPath = null;
+                }
+            }
+        });
+    }
+
+    @Override public void stopRecording() {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                if (recorder == null) return;
+                String path = recordingPath;
+                try { recorder.stop(); } catch (Exception ignored) {}
+                recorder.release();
+                recorder = null;
+                recordingPath = null;
+                if (path != null) Mobile.dispatchFile(path);
+            }
+        });
+    }
+
+    private void ensureSensor(String name) {
+        if (sensorManager == null) {
+            sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        }
+        if (sensorManager == null || sensorRegistered.contains(name)) return;
+        int type = Sensor.TYPE_ACCELEROMETER;
+        if (name.contains("gyro")) type = Sensor.TYPE_GYROSCOPE;
+        else if (name.contains("light")) type = Sensor.TYPE_LIGHT;
+        Sensor s = sensorManager.getDefaultSensor(type);
+        if (s == null) return;
+        sensorRegistered.add(name);
+        sensorManager.registerListener(new SensorEventListener() {
+            @Override public void onSensorChanged(SensorEvent e) {
+                sensorValues.put(name, e.values.clone());
+            }
+            @Override public void onAccuracyChanged(Sensor s, int accuracy) {}
+        }, s, SensorManager.SENSOR_DELAY_UI);
+    }
+
+    @Override public String sensor(String name) {
+        ensureSensor(name);
+        float[] v = sensorValues.get(name);
+        if (v == null || v.length == 0) return "";
+        if (v.length == 1) return Float.toString(v[0]);
+        if (v.length == 2) return v[0] + "," + v[1];
+        return v[0] + "," + v[1] + "," + v[2];
+    }
+
+    @Override protected void onDestroy() {
+        if (recorder != null) {
+            try { recorder.stop(); } catch (Exception ignored) {}
+            recorder.release();
+            recorder = null;
+        }
+        super.onDestroy();
     }
 
     @Override public void foreground(final String title, final String text) {

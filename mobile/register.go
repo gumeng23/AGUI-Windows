@@ -403,6 +403,29 @@ func registerUI(i *lang.Interp, a *App) {
 		return a.bridge.Location(), nil
 	})
 
+	reg("start_record", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("start_record", args, 0, 0); err != nil {
+			return nil, err
+		}
+		a.bridge.StartRecording()
+		return nil, nil
+	})
+
+	reg("stop_record", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("stop_record", args, 0, 0); err != nil {
+			return nil, err
+		}
+		a.bridge.StopRecording()
+		return nil, nil
+	})
+
+	reg("sensor", func(i *lang.Interp, args []lang.Value, kw map[string]lang.Value) (lang.Value, error) {
+		if err := argCount("sensor", args, 1, 1); err != nil {
+			return nil, err
+		}
+		return a.bridge.Sensor(lang.ToString(args[0])), nil
+	})
+
 	a.registerGame()
 }
 

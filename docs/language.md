@@ -1801,6 +1801,8 @@ win = window("星野养成", w=420, h=640)
 - 深链：清单注册 `agui://` scheme；应用收到链接时触发窗口 `intent` 事件，`win.intent` 读取 URL。启动 Activity 时和 `onNewIntent` 都会分发。
 - `camera()` 调用系统相机，返回缩略图并保存到缓存 JPEG，随后触发窗口 `file` 事件，路径在 `win.last_file`。
 - `location()` 返回最后已知位置 `"纬度,经度"`，无缓存定位时返回空字符串；需要 `ACCESS_FINE_LOCATION` 或 `ACCESS_COARSE_LOCATION`。
+- `start_record()` / `stop_record()` 使用麦克风录音，停止后触发窗口 `file` 事件，路径在 `win.last_file`；需要 `RECORD_AUDIO`。
+- `sensor("accelerometer")` 返回最近一次加速度 `x,y,z`；也支持 `"gyroscope"`、`"light"`。首次调用时注册监听，无数据返回空字符串。
 - `confirm(title, message)` 显示确定/取消对话框，结果在窗口 `confirm` 事件中读取 `win.confirm`（true=确定，false=取消）。`alert(title, message)` 只显示信息。
 - `save_file(name, content)` 打开系统“另存为”选择器；保存完成触发窗口 `saved` 事件，`win.saved` 是目标文档 URI。写入使用 SAF，不需要存储权限。
 - 构建 Android 需要 `android/runtime/agui.aar`（由 `gomobile bind ... ./mobile` 生成）以及 SDK/JDK；`--asset` 可把额外资源打进 APK。

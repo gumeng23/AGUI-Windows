@@ -41,6 +41,9 @@ type Bridge interface {
 	StopForeground()
 	Camera()
 	Location() string
+	StartRecording()
+	StopRecording()
+	Sensor(name string) string
 	SetTable(id int, json string)
 	Confirm(title string, message string)
 	SaveFile(name string, content string)
