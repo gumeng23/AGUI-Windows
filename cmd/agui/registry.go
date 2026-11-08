@@ -338,16 +338,16 @@ func installFromRegistry(ref, registryURL string, force bool, stack map[string]b
 		meta.Entry = name + ".ag"
 	}
 
+	for dep, depConstraint := range meta.Dependencies {
+		if err := installFromRegistry(dep+"@"+depConstraint, registryURL, force, stack); err != nil {
+			return fmt.Errorf("依赖 %s：%w", dep, err)
+		}
+	}
+
 	if !force {
 		if old, err := readInstalledVersion(name); err == nil && old == ver {
 			fmt.Printf("已安装 %s@%s，跳过\n", name, ver)
 			return nil
-		}
-	}
-
-	for dep, depConstraint := range meta.Dependencies {
-		if err := installFromRegistry(dep+"@"+depConstraint, registryURL, force, stack); err != nil {
-			return fmt.Errorf("依赖 %s：%w", dep, err)
 		}
 	}
 
@@ -580,6 +580,9 @@ func upgradePackages(refs []string, registryURL string, force bool) error {
 }
 
 func readInstalledVersion(name string) (string, error) {
+	if _, err := os.Stat(filepath.Join(packagesDir(), name)); err != nil {
+		return "", err
+	}
 	data, err := os.ReadFile(filepath.Join(packagesDir(), name+".json"))
 	if err != nil {
 		return "", err

@@ -183,6 +183,16 @@ func TestInstallDependencyAndVersionRange(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, "packages", "app", "app.ag")); err != nil {
 		t.Fatal(err)
 	}
+	// 同版本重装也应补齐缺失依赖。
+	if err := os.RemoveAll(filepath.Join(root, "packages", "base")); err != nil {
+		t.Fatal(err)
+	}
+	if err := installFromRegistry("app@^0.3.0", srv.URL+"/index.json", false, map[string]bool{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "packages", "base", "base.ag")); err != nil {
+		t.Fatal("同版本安装未补齐依赖:", err)
+	}
 }
 
 func TestZipTraversalRejected(t *testing.T) {
