@@ -907,6 +907,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\sign.ps1 -Exe hello.
 agui install https://example.com/mathx.ag mathx
 agui install .\mypkg mathx
 agui list
+agui search math
+agui outdated
+agui upgrade
 agui remove mathx
 ```
 
@@ -1576,10 +1579,13 @@ agui install mathx@0.1.0
 agui install https://example.com/mathx.ag mathx
 agui install .\mypkg mathx
 agui list
+agui search math
+agui outdated
+agui upgrade
 agui remove mathx
 ```
 
-包安装在项目根的 `packages/` 下，元数据写入 `packages/<name>.json`。安装目录时，入口优先 `<name>.ag`、`<name>/<name>.ag`、`index.ag`、`main.ag`。
+包安装在项目根的 `packages/` 下，元数据写入 `packages/<name>.json`。安装目录时，入口优先元数据 `entry`，再回退 `<name>.ag`、`<name>/<name>.ag`、`index.ag`、`main.ag`。
 
 默认 registry：
 
@@ -1593,14 +1599,16 @@ https://api.github.com/repos/gumeng23/AGUI-registry/contents/index.json
 - 下载 zip 后强制校验 SHA-256，再解压到 `packages/<name>/`；拒绝 `../` 等越界路径。
 - 依赖声明在包的 `agui-package.json` 中，安装时递归解析并写入 `agui.lock`。
 - `--registry <url>` 或环境变量 `AGUI_REGISTRY` 可覆盖索引；`--force` 覆盖已安装版本。
+- `search [关键词]` 搜索 registry；`outdated` 列出可升级包；`upgrade [包名...]` 升级指定包或全部。
+- `remove` 默认拒绝删除仍被其他包依赖的包；`--force` 强制删除。
 - 仓库格式见 https://github.com/gumeng23/AGUI-registry 。
 
 ```agui
 import "mathx"
-print(add(2, 3))
+print(mathx.add(2, 3))
 ```
 
-- 包是文本级包含：导入后定义直接进入当前环境，没有命名空间；推荐用唯一前缀避免冲突。
+- 导入会用文件名生成命名空间对象（如 `mathx.add`）；同一文件只执行一次。
 - 支持 registry 包名、HTTP(S) 直接 `.ag` 文件（20MB 上限、60 秒超时）和本地文件/目录。
 - registry 包是 zip：根目录包含 `agui-package.json` 和入口 `.ag`；单个 zip 上限 64MB。
 - `list` 显示名称、版本和入口。

@@ -87,6 +87,58 @@ func TestInstallFromRegistry(t *testing.T) {
 	}
 }
 
+func TestOutdatedAndUpgrade(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+
+	oldZip := makePackageZip(t, "mathx", "0.1.0", "mathx.ag")
+	newZip := makePackageZip(t, "mathx", "0.2.0", "mathx.ag")
+	oldSum := sha256.Sum256(oldZip)
+	newSum := sha256.Sum256(newZip)
+	oldURL := ""
+	newURL := ""
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/mathx-0.1.0.zip":
+			_, _ = w.Write(oldZip)
+			return
+		case "/mathx-0.2.0.zip":
+			_, _ = w.Write(newZip)
+			return
+		}
+		index := registryIndex{
+			Version: 1,
+			Packages: map[string]registryPackage{
+				"mathx": {
+					Latest: "0.2.0",
+					Versions: map[string]registryVersion{
+						"0.1.0": {URL: oldURL, SHA256: hex.EncodeToString(oldSum[:]), Entry: "mathx.ag"},
+						"0.2.0": {URL: newURL, SHA256: hex.EncodeToString(newSum[:]), Entry: "mathx.ag"},
+					},
+				},
+			},
+		}
+		_ = json.NewEncoder(w).Encode(index)
+	}))
+	defer srv.Close()
+	oldURL = srv.URL + "/mathx-0.1.0.zip"
+	newURL = srv.URL + "/mathx-0.2.0.zip"
+
+	if err := installFromRegistry("mathx@0.1.0", srv.URL+"/index.json", false, map[string]bool{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := outdatedPackages(srv.URL + "/index.json"); err != nil {
+		t.Fatal(err)
+	}
+	if err := upgradePackages(nil, srv.URL+"/index.json", false); err != nil {
+		t.Fatal(err)
+	}
+	got, err := readInstalledVersion("mathx")
+	if err != nil || got != "0.2.0" {
+		t.Fatalf("升级后版本 = %q, err=%v", got, err)
+	}
+}
+
 func TestInstallDependencyAndVersionRange(t *testing.T) {
 	root := t.TempDir()
 	t.Chdir(root)

@@ -6,6 +6,34 @@ import (
 	"testing"
 )
 
+func TestRemovePackageRespectsReverseDependency(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	dir := filepath.Join(root, "packages")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"dep", "app"} {
+		if err := os.WriteFile(filepath.Join(dir, name+".ag"), []byte("func f():\n    return 1\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	depMeta := `{"name":"dep","version":"1.0.0","source":"test","entry":"dep.ag"}`
+	appMeta := `{"name":"app","version":"1.0.0","source":"test","entry":"app.ag","dependencies":{"dep":"^1"}}`
+	if err := os.WriteFile(filepath.Join(dir, "dep.json"), []byte(depMeta), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "app.json"), []byte(appMeta), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := removePackage("dep", false); err == nil {
+		t.Fatal("删除被依赖的包应当失败")
+	}
+	if err := removePackage("dep", true); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestInstallListRemoveLocalPackage(t *testing.T) {
 	root := t.TempDir()
 	src := filepath.Join(root, "mypkg")
@@ -27,7 +55,7 @@ func TestInstallListRemoveLocalPackage(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, "packages", "mathx.json")); err != nil {
 		t.Fatal(err)
 	}
-	if err := removePackage("mathx"); err != nil {
+	if err := removePackage("mathx", false); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(root, "packages", "mathx")); !os.IsNotExist(err) {

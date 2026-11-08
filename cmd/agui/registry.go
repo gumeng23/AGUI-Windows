@@ -401,7 +401,11 @@ func installFromRegistry(ref, registryURL string, force bool, stack map[string]b
 	if err := os.Rename(tmp, dst); err != nil {
 		return err
 	}
-	pm := packageMeta{Name: name, Version: ver, Source: meta.URL, Entry: path.Join(name, entry)}
+	deps := meta.Dependencies
+	if len(manifest.Dependencies) > 0 {
+		deps = manifest.Dependencies
+	}
+	pm := packageMeta{Name: name, Version: ver, Source: meta.URL, Entry: path.Join(name, entry), Dependencies: deps}
 	if err := writePackageMeta(pm); err != nil {
 		return err
 	}
@@ -409,6 +413,169 @@ func installFromRegistry(ref, registryURL string, force bool, stack map[string]b
 		return err
 	}
 	fmt.Printf("已安装 %s@%s（入口 %s）\n", name, ver, pm.Entry)
+	return nil
+}
+
+func installedMetas() ([]packageMeta, error) {
+	root := packagesDir()
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var metas []packageMeta
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(root, e.Name()))
+		if err != nil {
+			continue
+		}
+		var m packageMeta
+		if json.Unmarshal(data, &m) != nil || m.Name == "" {
+			continue
+		}
+		metas = append(metas, m)
+	}
+	sort.Slice(metas, func(i, j int) bool { return metas[i].Name < metas[j].Name })
+	return metas, nil
+}
+
+func readPackageMeta(name string) (packageMeta, error) {
+	data, err := os.ReadFile(filepath.Join(packagesDir(), name+".json"))
+	if err != nil {
+		return packageMeta{}, err
+	}
+	var m packageMeta
+	if err := json.Unmarshal(data, &m); err != nil {
+		return packageMeta{}, err
+	}
+	return m, nil
+}
+
+func searchPackages(keyword, registryURL string) error {
+	idx, err := fetchRegistry(registryURL)
+	if err != nil {
+		return err
+	}
+	key := strings.ToLower(strings.TrimSpace(keyword))
+	names := make([]string, 0, len(idx.Packages))
+	for name := range idx.Packages {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	found := 0
+	for _, name := range names {
+		pkg := idx.Packages[name]
+		text := strings.ToLower(name + " " + pkg.Description)
+		if key != "" && !strings.Contains(text, key) {
+			continue
+		}
+		latest := pkg.Latest
+		if latest == "" {
+			latest = highestVersion(pkg)
+		}
+		fmt.Printf("%-24s %-10s %s\n", name, latest, pkg.Description)
+		found++
+	}
+	if found == 0 {
+		fmt.Printf("没有匹配 %q 的包\n", keyword)
+	}
+	return nil
+}
+
+func highestVersion(pkg registryPackage) string {
+	best := ""
+	for v := range pkg.Versions {
+		if best == "" || compareSemver(parseSemver(v), parseSemver(best)) > 0 {
+			best = v
+		}
+	}
+	return best
+}
+
+func outdatedPackages(registryURL string) error {
+	idx, err := fetchRegistry(registryURL)
+	if err != nil {
+		return err
+	}
+	metas, err := installedMetas()
+	if err != nil {
+		return err
+	}
+	if len(metas) == 0 {
+		fmt.Println("没有已安装的包")
+		return nil
+	}
+	found := 0
+	for _, m := range metas {
+		pkg, ok := idx.Packages[m.Name]
+		if !ok {
+			fmt.Printf("%-24s %-10s registry 中不存在\n", m.Name, m.Version)
+			continue
+		}
+		latest := pkg.Latest
+		if latest == "" {
+			latest = highestVersion(pkg)
+		}
+		if compareSemver(parseSemver(m.Version), parseSemver(latest)) < 0 {
+			fmt.Printf("%-24s %-10s -> %s\n", m.Name, m.Version, latest)
+			found++
+		}
+	}
+	if found == 0 {
+		fmt.Println("所有包都是最新版本")
+	}
+	return nil
+}
+
+func upgradePackages(refs []string, registryURL string, force bool) error {
+	metas, err := installedMetas()
+	if err != nil {
+		return err
+	}
+	if len(metas) == 0 {
+		fmt.Println("没有已安装的包")
+		return nil
+	}
+	byName := map[string]packageMeta{}
+	for _, m := range metas {
+		byName[m.Name] = m
+	}
+	if len(refs) == 0 {
+		for _, m := range metas {
+			refs = append(refs, m.Name)
+		}
+	}
+	for _, ref := range refs {
+		name, _ := splitPackageRef(ref)
+		old, ok := byName[name]
+		if !ok {
+			return fmt.Errorf("没有安装包 %q", name)
+		}
+		idx, err := fetchRegistry(registryURL)
+		if err != nil {
+			return err
+		}
+		pkg, ok := idx.Packages[name]
+		if !ok {
+			return fmt.Errorf("registry 中没有包 %q", name)
+		}
+		latest := pkg.Latest
+		if latest == "" {
+			latest = highestVersion(pkg)
+		}
+		if !force && compareSemver(parseSemver(old.Version), parseSemver(latest)) >= 0 {
+			fmt.Printf("%s@%s 已是最新\n", name, old.Version)
+			continue
+		}
+		if err := installFromRegistry(name+"@"+latest, registryURL, true, map[string]bool{}); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

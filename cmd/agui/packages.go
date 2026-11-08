@@ -13,18 +13,20 @@ import (
 )
 
 type packageMeta struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Source  string `json:"source"`
-	Entry   string `json:"entry,omitempty"`
+	Name         string            `json:"name"`
+	Version      string            `json:"version"`
+	Source       string            `json:"source"`
+	Entry        string            `json:"entry,omitempty"`
+	Dependencies map[string]string `json:"dependencies,omitempty"`
 }
 
 type lockEntry struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Source  string `json:"source"`
-	Entry   string `json:"entry"`
-	SHA256  string `json:"sha256"`
+	Name         string            `json:"name"`
+	Version      string            `json:"version"`
+	Source       string            `json:"source"`
+	Entry        string            `json:"entry"`
+	SHA256       string            `json:"sha256"`
+	Dependencies map[string]string `json:"dependencies,omitempty"`
 }
 
 type lockFile struct {
@@ -196,7 +198,7 @@ func addLockEntry(meta packageMeta) error {
 		return err
 	}
 	sum := sha256.Sum256(data)
-	entry := lockEntry{Name: meta.Name, Version: meta.Version, Source: meta.Source, Entry: meta.Entry, SHA256: hex.EncodeToString(sum[:])}
+	entry := lockEntry{Name: meta.Name, Version: meta.Version, Source: meta.Source, Entry: meta.Entry, SHA256: hex.EncodeToString(sum[:]), Dependencies: meta.Dependencies}
 	lf := lockFile{Version: 1}
 	if b, err := os.ReadFile(lockPath()); err == nil {
 		_ = json.Unmarshal(b, &lf)
@@ -230,6 +232,18 @@ func verifyLock() error {
 		return fmt.Errorf("agui.lock 解析失败：%v", err)
 	}
 	bad := 0
+	installed := map[string]bool{}
+	for _, e := range lf.Packages {
+		installed[e.Name] = true
+	}
+	for _, e := range lf.Packages {
+		for dep := range e.Dependencies {
+			if !installed[dep] {
+				fmt.Printf("缺依赖  %-20s -> %s\n", e.Name, dep)
+				bad++
+			}
+		}
+	}
 	for _, e := range lf.Packages {
 		data, err := os.ReadFile(filepath.Join(packagesDir(), filepath.FromSlash(e.Entry)))
 		if err != nil {
@@ -294,15 +308,38 @@ func listPackages() error {
 		if meta.Version == "" {
 			meta.Version = "?"
 		}
-		fmt.Printf("%-24s %-10s %s\n", meta.Name, meta.Version, meta.Source)
+		deps := ""
+		if len(meta.Dependencies) > 0 {
+			keys := make([]string, 0, len(meta.Dependencies))
+			for d := range meta.Dependencies {
+				keys = append(keys, d)
+			}
+			sort.Strings(keys)
+			deps = " 依赖: " + strings.Join(keys, ",")
+		}
+		fmt.Printf("%-24s %-10s %s%s\n", meta.Name, meta.Version, meta.Source, deps)
 	}
 	return nil
 }
 
-func removePackage(name string) error {
+func removePackage(name string, force bool) error {
 	clean, err := safePackageName(name)
 	if err != nil {
 		return err
+	}
+	metas, _ := installedMetas()
+	var blockers []string
+	for _, m := range metas {
+		if m.Name == clean {
+			continue
+		}
+		if _, ok := m.Dependencies[clean]; ok {
+			blockers = append(blockers, m.Name)
+		}
+	}
+	if len(blockers) > 0 && !force {
+		sort.Strings(blockers)
+		return fmt.Errorf("以下包依赖 %s：%s；使用 --force 强制删除", clean, strings.Join(blockers, ", "))
 	}
 	root := packagesDir()
 	removed := false

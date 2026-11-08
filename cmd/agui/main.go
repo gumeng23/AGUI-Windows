@@ -124,12 +124,77 @@ func main() {
 			fmt.Fprintln(os.Stderr, "错误："+err.Error())
 			os.Exit(1)
 		}
+	case "search":
+		rest := args[1:]
+		registryURL := os.Getenv("AGUI_REGISTRY")
+		var words []string
+		for i := 0; i < len(rest); i++ {
+			if rest[i] == "--registry" && i+1 < len(rest) {
+				i++
+				registryURL = rest[i]
+				continue
+			}
+			words = append(words, rest[i])
+		}
+		if err := searchPackages(strings.Join(words, " "), registryURL); err != nil {
+			fmt.Fprintln(os.Stderr, "错误："+err.Error())
+			os.Exit(1)
+		}
+	case "outdated":
+		registryURL := os.Getenv("AGUI_REGISTRY")
+		for i := 1; i < len(args); i++ {
+			if args[i] == "--registry" && i+1 < len(args) {
+				i++
+				registryURL = args[i]
+			}
+		}
+		if err := outdatedPackages(registryURL); err != nil {
+			fmt.Fprintln(os.Stderr, "错误："+err.Error())
+			os.Exit(1)
+		}
+	case "upgrade":
+		rest := args[1:]
+		registryURL := os.Getenv("AGUI_REGISTRY")
+		force := false
+		var refs []string
+		for i := 0; i < len(rest); i++ {
+			switch rest[i] {
+			case "--registry":
+				if i+1 >= len(rest) {
+					fmt.Fprintln(os.Stderr, "用法：agui upgrade [包名...] [--registry URL] [--force]")
+					os.Exit(2)
+				}
+				i++
+				registryURL = rest[i]
+			case "--force":
+				force = true
+			default:
+				refs = append(refs, rest[i])
+			}
+		}
+		if err := upgradePackages(refs, registryURL, force); err != nil {
+			fmt.Fprintln(os.Stderr, "错误："+err.Error())
+			os.Exit(1)
+		}
 	case "remove":
 		if len(args) < 2 {
-			fmt.Fprintln(os.Stderr, "用法：agui remove <包名>")
+			fmt.Fprintln(os.Stderr, "用法：agui remove <包名> [--force]")
 			os.Exit(2)
 		}
-		if err := removePackage(args[1]); err != nil {
+		force := false
+		name := ""
+		for _, a := range args[1:] {
+			if a == "--force" {
+				force = true
+			} else if name == "" {
+				name = a
+			}
+		}
+		if name == "" {
+			fmt.Fprintln(os.Stderr, "用法：agui remove <包名> [--force]")
+			os.Exit(2)
+		}
+		if err := removePackage(name, force); err != nil {
 			fmt.Fprintln(os.Stderr, "错误："+err.Error())
 			os.Exit(1)
 		}
@@ -189,8 +254,11 @@ func usage() {
   --registry <index.json>           覆盖默认 registry 索引
   --force                           覆盖已安装的同名包
   agui list                          列出已安装的包
-  agui remove <包名>                 删除已安装的包
-  agui verify                        按 agui.lock 校验包 SHA-256
+  agui search [关键词]               搜索 registry 中的包
+  agui outdated                      列出有新版本的已安装包
+  agui upgrade [包名...]             升级指定包或全部包
+  agui remove <包名> [--force]       删除已安装的包；有反向依赖时需 --force
+  agui verify                        按 agui.lock 校验包 SHA-256 与依赖
   agui watch <脚本.ag> [参数...]     文件变化时自动重启
   agui debug <脚本.ag> [参数...]     逐行跟踪（轻量调试器）
   agui lsp                           启动 LSP（stdio）

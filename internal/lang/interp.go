@@ -3,6 +3,7 @@ package lang
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -484,12 +485,23 @@ func (i *Interp) execImport(n *ast.ImportStmt, env *Env) {
 			if root == "" {
 				continue
 			}
-			for _, cand := range []string{
+			candidates := []string{
 				filepath.Join(root, "packages", pkg+".ag"),
 				filepath.Join(root, "packages", pkg, pkg+".ag"),
 				filepath.Join(root, "packages", pkg, "index.ag"),
 				filepath.Join(root, "packages", pkg, "main.ag"),
-			} {
+			}
+			if b, readErr := os.ReadFile(filepath.Join(root, "packages", pkg+".json")); readErr == nil {
+				var meta struct {
+					Entry string `json:"entry"`
+				}
+				if json.Unmarshal(b, &meta) == nil && meta.Entry != "" {
+					candidates = append([]string{
+						filepath.Join(root, "packages", filepath.FromSlash(meta.Entry)),
+					}, candidates...)
+				}
+			}
+			for _, cand := range candidates {
 				if b, readErr := os.ReadFile(cand); readErr == nil {
 					abs, _ := filepath.Abs(cand)
 					key = abs

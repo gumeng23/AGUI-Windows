@@ -585,7 +585,7 @@ game_loop(update, fps=60)
 - **RichEdit 增强**：选区、插入文字、超链接、插图。
 - **SQLite**：`sqlite_open()`、`exec/execute/query`、索引、异步查询。
 - **Canvas 鼠标事件**：`mousedown` / `mousemove` / `mouseup`。
-- **包管理器**：`agui install mathx[@版本]` 从 registry 下载、校验并解压，`import` 自动解析 `packages/`。
+- **包管理器**：`agui install mathx[@版本]` 从 registry 下载、校验并解压；`search/outdated/upgrade/remove` 管理包，`import` 自动解析 `packages/` 和元数据入口。
 
 ```agui
 b = bytes("Agui")
@@ -728,7 +728,7 @@ print(t.visible, t.last_error)
 - SQLite：`sqlite_open`；方法 `exec/execute/query/close`；属性 `tables/last_error/path/closed`。
 - 音频：`play_wav(path, loop=false)`、`stop_wav()`。
 - 托盘：`tray(icon=, tooltip=)`；`item/notify/set_icon/set_tooltip`；受限环境会降级并记录 `last_error`。
-- 包管理：`agui install <包名[@版本]>`、`agui install <URL/路径> [名称]`、`agui list`、`agui remove <名称>`，安装到 `packages/`；registry 包会校验 SHA-256 并写入 `agui.lock`。
+- 包管理：`agui install <包名[@版本]>`、`agui install <URL/路径> [名称]`、`agui list/search/outdated/upgrade`、`agui remove <名称> [--force]`，安装到 `packages/`；registry 包会校验 SHA-256、递归安装依赖并写入 `agui.lock`。
 
 ### 对话框与剪贴板
 
