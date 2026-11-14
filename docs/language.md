@@ -575,9 +575,15 @@ on btn.click:
     ...
 ```
 
-属性：`text`、`enabled`。
-方法：`click()`、`focus()`。
-事件：`click`。
+属性：`text`、`enabled`、`radius`（圆角像素）、`border`（边框色）、`hover_bg`（悬停色）、`pressed_bg`（按下色）、`shadow`（阴影）。
+
+```agui
+save = button("保存", bg="#2563EB", fg="#FFFFFF", radius=10,
+              border="#3B82F6", hover_bg="#1D4ED8",
+              pressed_bg="#1E40AF", shadow=true)
+```
+
+这些属性会启用 owner-draw 自绘按钮，同时保留原生键盘焦点与点击事件。方法：`click()`、`focus()`。事件：`click`。
 
 ### 10.4 edit
 
@@ -1172,7 +1178,32 @@ button("保存", fg="#FFFFFF", bg="#2563EB", w=140)
 button("删除", fg="#FFFFFF", bg="#DC2626", w=140)
 ```
 
-自绘按钮保留键盘焦点、默认按钮外框和禁用态；目前只支持纯色背景，不支持渐变/圆角。
+自绘按钮保留键盘焦点、默认按钮外框和禁用态，并支持圆角、描边、悬停/按下色和阴影：
+
+```agui
+button("保存", bg="#2563EB", fg="#FFFFFF", radius=10,
+       border="#3B82F6", hover_bg="#1D4ED8",
+       pressed_bg="#1E40AF", shadow=true)
+```
+
+### 16.9.1 agui-ui 组件包
+
+`agui-ui` 是基于这些原生属性封装的成品组件包，安装后即可使用：
+
+```powershell
+agui install agui-ui
+```
+
+```agui
+import "agui-ui"
+
+card = ui_card("账户设置", "卡片容器")
+save = ui_primary_button("保存更改", parent=card)
+cancel = ui_secondary_button("取消", parent=card)
+badge = ui_badge("NEW", "#7C3AED")
+```
+
+提供 `ui_primary_button`、`ui_secondary_button`、`ui_ghost_button`、`ui_danger_button`、`ui_success_button`、`ui_icon_button`、`ui_card`、`ui_badge`、`ui_heading`、`ui_muted`、`ui_divider`。完整示例见 `examples/ui_kit_package.ag`。
 
 ### 16.10 后台任务、取消与递归上限
 

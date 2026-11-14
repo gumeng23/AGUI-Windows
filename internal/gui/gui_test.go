@@ -31,6 +31,19 @@ func TestParseColorNames(t *testing.T) {
 	}
 }
 
+func TestColorString(t *testing.T) {
+	cases := map[uint32]string{
+		0xFFFFFF: "#FFFFFF",
+		0x0000FF: "#FF0000", // COLORREF BGR -> RGB
+		0x2563EB: "#EB6325",
+	}
+	for in, want := range cases {
+		if got := colorString(in); got != want {
+			t.Fatalf("colorString(0x%X) = %q；想要 %q", in, got, want)
+		}
+	}
+}
+
 func TestWidgetKwIncludesGeometry(t *testing.T) {
 	allowed := widgetKw("text")
 	for _, must := range []string{"x", "y", "w", "h", "font", "text"} {

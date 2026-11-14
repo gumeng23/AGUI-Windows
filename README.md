@@ -4,13 +4,13 @@
 [![License](https://img.shields.io/github/license/gumeng23/AGUI-Windows)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android-0078D4)
 
-Agui 是一门轻量、解释执行的脚本语言。它用接近 Python 的缩进语法，直接创建**原生 Windows 控件**，也能把同一份脚本构建成 **原生 Android 应用**；不需要 Electron、浏览器或额外运行时。解释器本身由 Go 写成，Windows 侧直调 Win32 API，Android 侧经 gomobile 调原生 View。当前版本 **0.9.4**。
+Agui 是一门轻量、解释执行的脚本语言。它用接近 Python 的缩进语法，直接创建**原生 Windows 控件**，也能把同一份脚本构建成 **原生 Android 应用**；不需要 Electron、浏览器或额外运行时。解释器本身由 Go 写成，Windows 侧直调 Win32 API，Android 侧经 gomobile 调原生 View。当前版本 **0.9.5**。
 
 ## 下载即用
 
 不想装任何东西：下载、解压，即可运行（绿色版，不写注册表）。
 
-1. **下载** [Agui-0.9.4-win64.zip](https://github.com/gumeng23/AGUI-Windows/releases/latest)（约 14 MB，含 `agui.exe`、`aguiw.exe`、全部示例与文档）
+1. **下载** [Agui-0.9.5-win64.zip](https://github.com/gumeng23/AGUI-Windows/releases/latest)（约 14 MB，含 `agui.exe`、`aguiw.exe`、全部示例与文档）
 2. **解压**到任意目录 —— 绿色版，不写注册表，不需要管理员权限
 3. 在该目录打开 PowerShell，三条命令：
 
@@ -55,7 +55,8 @@ on win.close:
 - **原生 GUI**：窗口、菜单栏、标签、按钮、输入框、复选框、列表、下拉框、进度条、滑块、图片、富文本、表格、树、标签页、分栏、工具栏、属性表，全部是 Win32 控件。
 - **现代外观**：运行时激活 Common Controls v6 视觉样式，按钮、复选框、滚动条跟随系统主题。
 - **多窗口**：`window()` 可创建任意多个顶层窗口（独立窗口，或用 `parent=` 创建从属窗口），每个窗口有独立的控件树、菜单栏和背景色。
-- **自绘彩色按钮**：按钮的 `fg` / `bg` 真正生效，支持自定义文字色、背景色和默认按钮样式。
+- **自绘彩色按钮**：按钮的 `fg` / `bg` 真正生效，支持圆角、描边、悬停/按下色、阴影和默认按钮样式；也可直接安装 `agui-ui` 成品组件包（`agui install agui-ui`）。
+- **组件包**：`agui-ui` 提供 `ui_primary_button`、`ui_card`、`ui_badge`、`ui_heading` 等成品，安装后 `import "agui-ui"` 即可用。
 - **类 Python 语法**：缩进代码块、`if/elif/else`、`while/for`、`func`、闭包、切片（含步长）、单行/多行 lambda、`try/catch/finally`、`raise`、`import`、轻量 `class`。
 - **事件即语法**：`on btn.click:` 注册点击事件，代码结构一眼可见。
 - **后台任务**：`async(work, then=...)` 返回可等待、可取消的 `task`；任务在后台协作式运行，完成后回到 UI 线程更新界面。

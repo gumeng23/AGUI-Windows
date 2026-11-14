@@ -133,7 +133,8 @@ func Register(i *lang.Interp) *App {
 		if err := lang.CheckArity("button", args, 1); err != nil {
 			return nil, err
 		}
-		if err := checkKw(kwargs, widgetKw("text")...); err != nil {
+		if err := checkKw(kwargs, append(widgetKw("text"),
+			"radius", "corner", "border", "hover_bg", "pressed_bg", "shadow")...); err != nil {
 			return nil, err
 		}
 		text := lang.ToString(lang.Named(args, kwargs, 0, "text", "按钮"))
@@ -145,7 +146,17 @@ func Register(i *lang.Interp) *App {
 		if err != nil {
 			return nil, err
 		}
-		return widget, app.applyCommon(widget, kwargs)
+		if err := app.applyCommon(widget, kwargs); err != nil {
+			return nil, err
+		}
+		for _, name := range []string{"radius", "corner", "border", "hover_bg", "pressed_bg", "shadow"} {
+			if v, ok := kwargs[name]; ok {
+				if err := widget.SetProp(name, v); err != nil {
+					return nil, err
+				}
+			}
+		}
+		return widget, nil
 	})
 
 	reg("tray", func(_ *lang.Interp, args []lang.Value, kwargs map[string]lang.Value) (lang.Value, error) {

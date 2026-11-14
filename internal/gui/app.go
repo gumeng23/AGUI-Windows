@@ -665,6 +665,19 @@ func (a *App) addWidget(w *Widget) {
 	a.byID[w.id] = w
 }
 
+func (a *App) drawOwnerButton(lparam uintptr) bool {
+	dis := (*drawItemStruct)(unsafe.Pointer(lparam))
+	if dis.ctlType != odtButton {
+		return false
+	}
+	w := a.widgetByHWND(dis.hwndItem)
+	if w == nil || !w.ownerDraw {
+		return false
+	}
+	w.drawButton(dis)
+	return true
+}
+
 func (a *App) removeWindow(w *Widget) {
 	if w == nil {
 		return
@@ -868,12 +881,8 @@ func mainWndProc(hwnd, msg, wparam, lparam uintptr) (ret uintptr) {
 			return lr
 		}
 	case wmDrawItem:
-		dis := (*drawItemStruct)(unsafe.Pointer(lparam))
-		if dis.ctlType == odtButton {
-			if w := a.widgetByHWND(dis.hwndItem); w != nil && w.ownerDraw {
-				w.drawButton(dis)
-				return 1
-			}
+		if a.drawOwnerButton(lparam) {
+			return 1
 		}
 		return 0
 
@@ -993,7 +1002,7 @@ func mainWndProc(hwnd, msg, wparam, lparam uintptr) (ret uintptr) {
 			if w.hasBg {
 				bg = w.bg
 			}
-			if w.parent != nil {
+			if w.parent != nil && !w.hasBg {
 				bg = w.parent.bgColor
 			}
 		}
@@ -1150,6 +1159,10 @@ func parseColor(s string) (uint32, bool) {
 		return 0, false
 	}
 	return 0, false
+}
+
+func colorString(c uint32) string {
+	return fmt.Sprintf("#%02X%02X%02X", c&0xFF, (c>>8)&0xFF, (c>>16)&0xFF)
 }
 
 func parseColorOr(s string, def uint32) uint32 {

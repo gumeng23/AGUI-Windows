@@ -1,0 +1,27 @@
+# 使用包管理器安装的 agui-ui 组件库
+# 先运行：agui install agui-ui
+import "agui-ui"
+
+win = window("Agui UI Kit · 包", 760, 520, bg="#0B1220")
+
+head = ui_heading("Agui UI Kit")
+muted = ui_muted("来自 agui-ui 包：原生自绘按钮、卡片、徽章与分隔线。")
+
+card = ui_card("账户设置", "这是使用 ui_card() 创建的卡片容器。")
+primary = ui_primary_button("保存更改", parent=card)
+secondary = ui_secondary_button("取消", parent=card)
+danger = ui_danger_button("删除账户", parent=card)
+
+line = ui_divider()
+badge = ui_badge("NEW", "#7C3AED")
+ghost = ui_ghost_button("查看文档")
+icon = ui_icon_button("+", "新建项目")
+
+status = ui_muted("就绪")
+
+on primary.click:
+    status.text = "已保存"
+on danger.click:
+    status.text = "危险操作已触发"
+on icon.click:
+    status.text = "新建项目"

@@ -1,0 +1,81 @@
+# Agui UI Kit — 精品控件成品
+# 依赖 Agui >= 0.9.5 的原生圆角/hover/pressed 按钮属性。
+
+func ui_button(text="按钮", bg="#2563EB", fg="#FFFFFF", border=null,
+               hover=null, pressed=null, radius=10, shadow=false,
+               width=0, tip="", parent=null):
+    if parent == null:
+        b = button(text, bg=bg, fg=fg, radius=radius, shadow=shadow)
+    else:
+        b = button(text, bg=bg, fg=fg, radius=radius, shadow=shadow, parent=parent)
+    if border != null:
+        b.border = border
+    if hover != null:
+        b.hover_bg = hover
+    if pressed != null:
+        b.pressed_bg = pressed
+    if width > 0:
+        b.w = width
+    if tip != "":
+        b.tooltip = tip
+    return b
+
+func ui_primary_button(text="保存", parent=null):
+    return ui_button(text, bg="#2563EB", fg="#FFFFFF", border="#3B82F6",
+                     hover="#1D4ED8", pressed="#1E40AF", radius=10,
+                     shadow=true, parent=parent)
+
+func ui_secondary_button(text="取消", parent=null):
+    return ui_button(text, bg="#1E293B", fg="#E2E8F0", border="#475569",
+                     hover="#334155", pressed="#0F172A", radius=10,
+                     parent=parent)
+
+func ui_ghost_button(text="了解更多", parent=null):
+    return ui_button(text, bg="#0B1220", fg="#93C5FD", border="#1D4ED8",
+                     hover="#111C34", pressed="#0B1220", radius=10,
+                     parent=parent)
+
+func ui_danger_button(text="删除", parent=null):
+    return ui_button(text, bg="#B91C1C", fg="#FFFFFF", border="#EF4444",
+                     hover="#991B1B", pressed="#7F1D1D", radius=10,
+                     shadow=true, parent=parent)
+
+func ui_success_button(text="发布", parent=null):
+    return ui_button(text, bg="#047857", fg="#FFFFFF", border="#10B981",
+                     hover="#065F46", pressed="#064E3B", radius=10,
+                     shadow=true, parent=parent)
+
+func ui_icon_button(icon="+", tip="", parent=null):
+    return ui_button(icon, bg="#1E293B", fg="#E2E8F0", border="#475569",
+                     hover="#334155", pressed="#0F172A", radius=9,
+                     width=40, tip=tip, parent=parent)
+
+func ui_card(title="卡片", body="", parent=null):
+    if parent == null:
+        card = panel(bg="#111827", w=340, h=190)
+    else:
+        card = panel(bg="#111827", w=340, h=190, parent=parent)
+    label(title, font=font("Microsoft YaHei UI", 12, bold=true), fg="#F8FAFC", parent=card)
+    if body != "":
+        label(body, font=font("Microsoft YaHei UI", 10), fg="#94A3B8", parent=card)
+    return card
+
+func ui_badge(text="NEW", color="#2563EB", parent=null):
+    if parent == null:
+        return label(text, bg=color, fg="#FFFFFF", w=72, font=font("Microsoft YaHei UI", 9, bold=true))
+    return label(text, bg=color, fg="#FFFFFF", w=72, font=font("Microsoft YaHei UI", 9, bold=true), parent=parent)
+
+func ui_heading(text="标题", parent=null):
+    if parent == null:
+        return label(text, fg="#F8FAFC", font=font("Microsoft YaHei UI", 18, bold=true))
+    return label(text, fg="#F8FAFC", font=font("Microsoft YaHei UI", 18, bold=true), parent=parent)
+
+func ui_muted(text="辅助说明", parent=null):
+    if parent == null:
+        return label(text, fg="#94A3B8", font=font("Microsoft YaHei UI", 10))
+    return label(text, fg="#94A3B8", font=font("Microsoft YaHei UI", 10), parent=parent)
+
+func ui_divider(parent=null):
+    if parent == null:
+        return panel(bg="#1F2937", h=1)
+    return panel(bg="#1F2937", h=1, parent=parent)

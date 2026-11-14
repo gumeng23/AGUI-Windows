@@ -1,0 +1,8 @@
+{
+  "name": "agui-ui",
+  "version": "0.1.0",
+  "description": "Agui 精品 UI 组件：原生圆角按钮、卡片、徽章、标题与分隔线",
+  "entry": "agui-ui.ag",
+  "dependencies": {},
+  "agui": ">=0.9.5"
+}

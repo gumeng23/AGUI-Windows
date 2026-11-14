@@ -70,6 +70,7 @@ var (
 	pGetWindowLongPtrW         = user32.NewProc("GetWindowLongPtrW")
 	pSetWindowLongPtrW         = user32.NewProc("SetWindowLongPtrW")
 	pCallWindowProcW           = user32.NewProc("CallWindowProcW")
+	pTrackMouseEvent           = user32.NewProc("TrackMouseEvent")
 	pDrawTextW                 = user32.NewProc("DrawTextW")
 	pDrawEdge                  = user32.NewProc("DrawEdge")
 	pDrawFocusRect             = user32.NewProc("DrawFocusRect")
@@ -97,6 +98,7 @@ var (
 	pMoveToEx               = gdi32.NewProc("MoveToEx")
 	pLineTo                 = gdi32.NewProc("LineTo")
 	pRectangle              = gdi32.NewProc("Rectangle")
+	pRoundRect              = gdi32.NewProc("RoundRect")
 	pEllipse                = gdi32.NewProc("Ellipse")
 	pTextOutW               = gdi32.NewProc("TextOutW")
 	pDeleteObject           = gdi32.NewProc("DeleteObject")
@@ -182,6 +184,7 @@ const (
 	wmMButtonDown     = 0x0207
 	wmMButtonUp       = 0x0208
 	wmMouseMove       = 0x0200
+	wmMouseLeave      = 0x02A3
 	wmDblClk          = 0x0203
 	wmSetFocus        = 0x0007
 	wmKillFocus       = 0x0008
@@ -214,6 +217,7 @@ const (
 	wmDrawItem        = 0x002B
 	psSolid           = 0
 	nullBrush         = 5
+	nullPen           = 8
 	transparent       = 1
 	wmNotify          = 0x004E
 	wmKeyDown         = 0x0100
@@ -428,6 +432,13 @@ type rect struct {
 
 type point struct {
 	x, y int32
+}
+
+type trackMouseEvent struct {
+	cbSize      uint32
+	dwFlags     uint32
+	hwndTrack   syscall.Handle
+	dwHoverTime uint32
 }
 
 type minMaxInfo struct {
@@ -719,6 +730,15 @@ func killTimer(hwnd syscall.Handle, id uintptr) {
 	pKillTimer.Call(uintptr(hwnd), id)
 }
 
+func trackMouseLeave(hwnd syscall.Handle) {
+	tme := trackMouseEvent{
+		cbSize:    uint32(unsafe.Sizeof(trackMouseEvent{})),
+		dwFlags:   2, // TME_LEAVE
+		hwndTrack: hwnd,
+	}
+	pTrackMouseEvent.Call(uintptr(unsafe.Pointer(&tme)))
+}
+
 func fillRect(hdc syscall.Handle, r *rect, brush syscall.Handle) {
 	pFillRect.Call(uintptr(hdc), uintptr(unsafe.Pointer(r)), uintptr(brush))
 }
@@ -786,6 +806,15 @@ func setBkColor(hdc syscall.Handle, color uint32) {
 func stockObject(id int32) syscall.Handle {
 	h, _, _ := pGetStockObject.Call(uintptr(id))
 	return syscall.Handle(h)
+}
+
+func roundRect(hdc syscall.Handle, r *rect, radius int32, brush, pen syscall.Handle) {
+	oldBrush := selectObject(hdc, brush)
+	oldPen := selectObject(hdc, pen)
+	pRoundRect.Call(uintptr(hdc), uintptr(r.left), uintptr(r.top),
+		uintptr(r.right), uintptr(r.bottom), uintptr(radius*2), uintptr(radius*2))
+	selectObject(hdc, oldBrush)
+	selectObject(hdc, oldPen)
 }
 
 var processPerMonitor bool

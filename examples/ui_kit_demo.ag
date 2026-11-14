@@ -1,0 +1,36 @@
+# 精品 UI 组件库预览（Windows 原生自绘按钮）
+win = window("Agui UI Kit", 760, 500, bg="#0B1220")
+
+title = label("精致按钮", font=font("Microsoft YaHei UI", 24, bold=true), fg="#F8FAFC")
+sub = label("圆角、悬停、按下、边框、阴影与禁用态，全部保留原生键盘与焦点。",
+            font=font("Microsoft YaHei UI", 11), fg="#94A3B8")
+
+primary = button("保存更改", bg="#2563EB", fg="#FFFFFF", radius=10, border="#3B82F6",
+                 hover_bg="#1D4ED8", pressed_bg="#1E40AF", shadow=true,
+                 font=font("Microsoft YaHei UI", 11, bold=true))
+secondary = button("取消", bg="#1E293B", fg="#E2E8F0", radius=10, border="#475569",
+                   hover_bg="#334155", pressed_bg="#0F172A",
+                   font=font("Microsoft YaHei UI", 11))
+danger = button("删除项目", bg="#B91C1C", fg="#FFFFFF", radius=10, border="#EF4444",
+                hover_bg="#991B1B", pressed_bg="#7F1D1D", shadow=true,
+                font=font("Microsoft YaHei UI", 11, bold=true))
+success = button("发布", bg="#047857", fg="#FFFFFF", radius=10, border="#10B981",
+                 hover_bg="#065F46", pressed_bg="#064E3B", shadow=true,
+                 font=font("Microsoft YaHei UI", 11, bold=true))
+ghost = button("了解更多", bg="#0B1220", fg="#93C5FD", radius=10, border="#1D4ED8",
+               hover_bg="#111C34", pressed_bg="#0B1220",
+               font=font("Microsoft YaHei UI", 11))
+disabled = button("不可用", bg="#111827", fg="#475569", radius=10, border="#1F2937",
+                  font=font("Microsoft YaHei UI", 11))
+disabled.enabled = false
+
+status = label("提示：把鼠标移到按钮上，或按住不放。", font=font("Microsoft YaHei UI", 11), fg="#64748B")
+
+on primary.click:
+    status.text = "已保存（原生按钮事件）"
+on danger.click:
+    status.text = "已删除（危险操作）"
+on success.click:
+    status.text = "已发布"
+on ghost.click:
+    status.text = "了解更多被点击"

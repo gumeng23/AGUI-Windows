@@ -95,7 +95,19 @@ type Widget struct {
 	imgFit    bool
 	imgLoaded bool
 
-	ownerDraw bool
+	ownerDraw   bool
+	corner      int32
+	hasBorder   bool
+	border      uint32
+	hasHover    bool
+	hoverBg     uint32
+	hasPress    bool
+	pressBg     uint32
+	shadow      bool
+	btnOldProc  uintptr
+	btnHover    bool
+	btnPressed  bool
+	btnTracking bool
 
 	treeLabels map[syscall.Handle]string
 	treePaths  map[string]syscall.Handle
@@ -461,6 +473,25 @@ func (w *Widget) GetProp(name string) (lang.Value, bool) {
 		return getWindowText(w.hwnd), true
 	case "tooltip":
 		return w.tooltip, true
+	case "radius", "corner":
+		return w.app.logical(w.corner), true
+	case "border", "border_color":
+		if !w.hasBorder {
+			return "", true
+		}
+		return colorString(w.border), true
+	case "hover_bg":
+		if !w.hasHover {
+			return "", true
+		}
+		return colorString(w.hoverBg), true
+	case "pressed_bg":
+		if !w.hasPress {
+			return "", true
+		}
+		return colorString(w.pressBg), true
+	case "shadow":
+		return w.shadow, true
 	case "tooltip_visible":
 		return w.tooltipVisible(), true
 	case "tooltip_tools":
@@ -800,6 +831,53 @@ func (w *Widget) SetProp(name string, v lang.Value) error {
 		}
 		w.font = f
 		sendMessage(w.hwnd, wmSetFont, uintptr(h), 1)
+		return nil
+	case "radius", "corner":
+		f, ok := v.(float64)
+		if !ok {
+			return fmt.Errorf("%s 必须是数字", name)
+		}
+		w.corner = w.app.px(f)
+		if w.corner < 0 {
+			w.corner = 0
+		}
+		w.setOwnerDraw()
+		invalidateRect(w.hwnd, nil, true)
+		return nil
+	case "border":
+		s, ok := v.(string)
+		if !ok {
+			return fmt.Errorf("border 必须是颜色字符串")
+		}
+		c, ok := parseColor(s)
+		if !ok {
+			return fmt.Errorf("无法识别颜色 %q", s)
+		}
+		w.hasBorder, w.border = true, c
+		w.setOwnerDraw()
+		invalidateRect(w.hwnd, nil, true)
+		return nil
+	case "hover_bg", "pressed_bg":
+		s, ok := v.(string)
+		if !ok {
+			return fmt.Errorf("%s 必须是颜色字符串", name)
+		}
+		c, ok := parseColor(s)
+		if !ok {
+			return fmt.Errorf("无法识别颜色 %q", s)
+		}
+		if name == "hover_bg" {
+			w.hasHover, w.hoverBg = true, c
+		} else {
+			w.hasPress, w.pressBg = true, c
+		}
+		w.setOwnerDraw()
+		invalidateRect(w.hwnd, nil, true)
+		return nil
+	case "shadow":
+		w.shadow = lang.Truthy(v)
+		w.setOwnerDraw()
+		invalidateRect(w.hwnd, nil, true)
 		return nil
 	case "fg", "bg":
 		s, ok := v.(string)
@@ -1666,8 +1744,54 @@ func (w *Widget) setOwnerDraw() {
 	style := getWindowLong(w.hwnd, gwlStyle)
 	setWindowLong(w.hwnd, gwlStyle, style|bsOwnerDraw)
 	w.ownerDraw = true
+	if w.btnOldProc == 0 {
+		w.btnOldProc = setWindowLong(w.hwnd, gwlWndProc, buttonProcCallback)
+	}
 	invalidateRect(w.hwnd, nil, true)
 }
+
+func buttonWndProc(hwnd syscall.Handle, msg uint32, wparam, lparam uintptr) uintptr {
+	a := currentApp
+	if a != nil {
+		if w := a.widgetByHWND(hwnd); w != nil {
+			switch msg {
+			case wmMouseMove:
+				if !w.btnTracking {
+					w.btnTracking = true
+					trackMouseLeave(hwnd)
+				}
+				if !w.btnHover {
+					w.btnHover = true
+					invalidateRect(hwnd, nil, true)
+				}
+			case wmMouseLeave:
+				w.btnTracking = false
+				if w.btnHover {
+					w.btnHover = false
+					invalidateRect(hwnd, nil, true)
+				}
+			case wmLButtonDown:
+				if !w.btnPressed {
+					w.btnPressed = true
+					invalidateRect(hwnd, nil, true)
+				}
+			case wmLButtonUp:
+				if w.btnPressed {
+					w.btnPressed = false
+					invalidateRect(hwnd, nil, true)
+				}
+			}
+			if w.btnOldProc != 0 {
+				r, _, _ := pCallWindowProcW.Call(w.btnOldProc,
+					uintptr(hwnd), uintptr(msg), wparam, lparam)
+				return r
+			}
+		}
+	}
+	return defWindowProc(hwnd, msg, wparam, lparam)
+}
+
+var buttonProcCallback = syscall.NewCallback(buttonWndProc)
 
 func shadeColor(c uint32, f float64) uint32 {
 	r := float64(c&0xFF) * f
@@ -1700,21 +1824,56 @@ func (w *Widget) drawButton(dis *drawItemStruct) {
 	if disabled {
 		bg = shadeColor(bg, 1.08)
 		fg = 0x9A9A9A
+	} else if w.btnPressed && w.hasPress {
+		bg = w.pressBg
 	} else if selected {
 		bg = shadeColor(bg, 0.86)
+	} else if w.btnHover && w.hasHover {
+		bg = w.hoverBg
 	}
-	fillRect(hdc, &dis.rcItem, w.app.brushFor(bg))
-	edge := uint32(edgeRaised)
-	if selected {
-		edge = edgeSunken
+	radius := w.app.px(float64(w.corner))
+	if radius < 0 {
+		radius = 0
 	}
-	drawEdge(hdc, &dis.rcItem, edge, bfRect)
+	maxR := (dis.rcItem.bottom - dis.rcItem.top) / 2
+	if radius > maxR {
+		radius = maxR
+	}
+	if radius > 0 {
+		if w.shadow && !w.btnPressed && !disabled {
+			shadowRect := dis.rcItem
+			shadowRect.left += w.app.px(1)
+			shadowRect.right -= w.app.px(1)
+			shadowRect.top += w.app.px(2)
+			shadowRect.bottom += w.app.px(1)
+			roundRect(hdc, &shadowRect, radius, w.app.brushFor(shadeColor(bg, 0.72)), stockObject(nullPen))
+		}
+		pen := stockObject(nullPen)
+		if w.hasBorder {
+			pen = createPen(w.border, 1)
+		}
+		roundRect(hdc, &dis.rcItem, radius, w.app.brushFor(bg), pen)
+		if w.hasBorder {
+			deleteObject(pen)
+		}
+	} else {
+		fillRect(hdc, &dis.rcItem, w.app.brushFor(bg))
+		edge := uint32(edgeRaised)
+		if selected {
+			edge = edgeSunken
+		}
+		drawEdge(hdc, &dis.rcItem, edge, bfRect)
+	}
 
 	textRect := dis.rcItem
-	textRect.left += w.app.px(8)
-	textRect.right -= w.app.px(8)
+	textRect.left += w.app.px(10)
+	textRect.right -= w.app.px(10)
 	textRect.top += 1
 	textRect.bottom -= 1
+	if w.btnPressed && !disabled {
+		textRect.top += 1
+		textRect.bottom += 1
+	}
 	setBkMode(hdc, 1)
 	setTextColor(hdc, fg)
 	font := w.app.hFont
@@ -1733,9 +1892,15 @@ func (w *Widget) drawButton(dis *drawItemStruct) {
 		focus.top += w.app.px(4)
 		focus.right -= w.app.px(4)
 		focus.bottom -= w.app.px(4)
-		drawFocusRect(hdc, &focus)
+		if radius > 0 {
+			focusPen := createPen(0x94A3B8, 1)
+			roundRect(hdc, &focus, radius, stockObject(nullBrush), focusPen)
+			deleteObject(focusPen)
+		} else {
+			drawFocusRect(hdc, &focus)
+		}
 	}
-	if dis.itemState&odsDefault != 0 {
+	if dis.itemState&odsDefault != 0 && radius == 0 {
 		outer := dis.rcItem
 		outer.left++
 		outer.top++

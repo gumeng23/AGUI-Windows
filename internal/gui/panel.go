@@ -39,6 +39,11 @@ func panelWndProc(hwnd syscall.Handle, msg uint32, wparam, lparam uintptr) uintp
 			w.endSplitDrag()
 			return 0
 		}
+	case wmDrawItem:
+		if a.drawOwnerButton(lparam) {
+			return 1
+		}
+		return 0
 	case wmEraseBkgnd:
 		if w != nil {
 			hdc := syscall.Handle(wparam)
